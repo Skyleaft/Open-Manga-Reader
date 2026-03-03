@@ -1,7 +1,9 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import '../../../../core/constants/app_colors.dart';
 
-class DiscoverHeader extends StatelessWidget {
+class DiscoverHeader extends StatefulWidget {
   final bool isDark;
   final Function(String) onSearch;
   final VoidCallback onShowQueue;
@@ -28,6 +30,34 @@ class DiscoverHeader extends StatelessWidget {
   });
 
   @override
+  State<DiscoverHeader> createState() => _DiscoverHeaderState();
+}
+
+class _DiscoverHeaderState extends State<DiscoverHeader> {
+  Timer? _debounceTimer;
+  late final TextEditingController _searchController;
+
+  @override
+  void initState() {
+    super.initState();
+    _searchController = TextEditingController();
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    _debounceTimer?.cancel();
+    super.dispose();
+  }
+
+  void _debounceSearch(String value) {
+    _debounceTimer?.cancel();
+    _debounceTimer = Timer(const Duration(milliseconds: 300), () {
+      widget.onSearch(value);
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
@@ -42,13 +72,13 @@ class DiscoverHeader extends StatelessWidget {
                 style: TextStyle(
                   fontSize: 24,
                   fontWeight: FontWeight.bold,
-                  color: isDark ? Colors.white : AppColors.secondary,
+                  color: widget.isDark ? Colors.white : AppColors.secondary,
                 ),
               ),
               Row(
                 children: [
                   IconButton(
-                    onPressed: onSearchScrapSource,
+                    onPressed: widget.onSearchScrapSource,
                     icon: const Icon(
                       Icons.search_outlined,
                       color: AppColors.primary,
@@ -56,7 +86,7 @@ class DiscoverHeader extends StatelessWidget {
                   ),
 
                   IconButton(
-                    onPressed: onShowQueue,
+                    onPressed: widget.onShowQueue,
                     icon: const Icon(
                       Icons.notifications_none,
                       color: AppColors.primary,
@@ -71,13 +101,14 @@ class DiscoverHeader extends StatelessWidget {
           Container(
             height: 48,
             decoration: BoxDecoration(
-              color: isDark
+              color: widget.isDark
                   ? AppColors.primary.withOpacity(0.1)
                   : AppColors.primary.withOpacity(0.1),
               borderRadius: BorderRadius.circular(12),
             ),
             child: TextField(
-              onSubmitted: onSearch,
+              controller: _searchController,
+              onChanged: _debounceSearch,
               decoration: const InputDecoration(
                 hintText: 'Search manga, manhwa, artists...',
                 prefixIcon: Icon(Icons.search, color: Colors.grey),
@@ -93,11 +124,11 @@ class DiscoverHeader extends StatelessWidget {
             child: Row(
               children: [
                 GestureDetector(
-                  onTap: onFilter,
+                  onTap: widget.onFilter,
                   child: _buildFilterButton(
                     Icons.filter_list,
                     'Filters',
-                    isActive: hasFilters,
+                    isActive: widget.hasFilters,
                   ),
                 ),
                 _buildSortPicker(),
@@ -147,10 +178,10 @@ class DiscoverHeader extends StatelessWidget {
       'createdAt': 'Release Date',
     };
 
-    String label = sortOptions[currentSortBy] ?? 'Sort';
+    String label = sortOptions[widget.currentSortBy] ?? 'Sort';
 
     return PopupMenuButton<String>(
-      onSelected: onSortChanged,
+      onSelected: widget.onSortChanged,
       itemBuilder: (context) => sortOptions.entries.map((e) {
         return PopupMenuItem(value: e.key, child: Text(e.value));
       }).toList(),
@@ -169,14 +200,14 @@ class DiscoverHeader extends StatelessWidget {
               style: TextStyle(
                 fontSize: 12,
                 fontWeight: FontWeight.bold,
-                color: isDark ? Colors.white : Colors.black87,
+                color: widget.isDark ? Colors.white : Colors.black87,
               ),
             ),
             const SizedBox(width: 4),
             Icon(
               Icons.arrow_drop_down,
               size: 18,
-              color: isDark ? Colors.white70 : Colors.black54,
+              color: widget.isDark ? Colors.white70 : Colors.black54,
             ),
           ],
         ),
@@ -186,7 +217,7 @@ class DiscoverHeader extends StatelessWidget {
 
   Widget _buildOrderToggle() {
     return GestureDetector(
-      onTap: onOrderToggle,
+      onTap: widget.onOrderToggle,
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
         decoration: BoxDecoration(
@@ -195,9 +226,9 @@ class DiscoverHeader extends StatelessWidget {
           borderRadius: BorderRadius.circular(8),
         ),
         child: Icon(
-          currentOrderBy == 'asc' ? Icons.south : Icons.north,
+          widget.currentOrderBy == 'asc' ? Icons.south : Icons.north,
           size: 18,
-          color: isDark ? Colors.white70 : AppColors.primary,
+          color: widget.isDark ? Colors.white70 : AppColors.primary,
         ),
       ),
     );

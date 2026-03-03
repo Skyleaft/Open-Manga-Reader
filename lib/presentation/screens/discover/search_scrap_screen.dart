@@ -6,6 +6,7 @@ import 'package:my_manga_reader/data/services/manga_api_service.dart';
 import 'package:my_manga_reader/routes/app_pages.dart';
 import 'package:my_manga_reader/data/models/search_result.dart';
 import 'dart:async';
+import 'package:dio/dio.dart';
 
 class SearchScrapScreen extends StatefulWidget {
   const SearchScrapScreen({super.key});
@@ -31,6 +32,8 @@ class _SearchScrapScreenState extends State<SearchScrapScreen> {
   bool _hasMoreResults = true;
 
   Timer? _debounceTimer;
+  CancelToken? _searchCancelToken;
+  int _searchRequestCounter = 0;
 
   @override
   void initState() {
@@ -42,6 +45,7 @@ class _SearchScrapScreenState extends State<SearchScrapScreen> {
   @override
   void dispose() {
     _debounceTimer?.cancel();
+    _searchCancelToken?.cancel();
     _searchController.dispose();
     super.dispose();
   }
@@ -72,18 +76,17 @@ class _SearchScrapScreenState extends State<SearchScrapScreen> {
   }
 
   void _onSearchChanged() {
-    _debounceTimer?.cancel();
-
-    _debounceTimer = Timer(const Duration(milliseconds: 500), () {
-      _searchQuery = _searchController.text;
-      _currentPage = 1;
-      _hasMoreResults = true;
-      _performSearch();
-    });
+    // Only update search query, don't perform search
+    _searchQuery = _searchController.text;
   }
 
   Future<void> _performSearch() async {
     final query = _searchQuery.trim();
+    final currentRequestCounter = ++_searchRequestCounter;
+
+    // Cancel any ongoing search request
+    _searchCancelToken?.cancel();
+    _searchCancelToken = CancelToken();
 
     setState(() {
       _isLoadingSearch = true;
@@ -100,6 +103,11 @@ class _SearchScrapScreenState extends State<SearchScrapScreen> {
         page: _currentPage,
         provider: _selectedProviderName, // ✅ FIX pakai providerName
       );
+
+      // Check if this request is still the latest one
+      if (currentRequestCounter != _searchRequestCounter) {
+        return; // Ignore results from cancelled request
+      }
 
       if (!mounted) return;
 
@@ -124,6 +132,11 @@ class _SearchScrapScreenState extends State<SearchScrapScreen> {
         _hasMoreResults = results.length >= pageSize;
       });
     } catch (e) {
+      // Check if this request was cancelled
+      if (e is DioException && e.type == DioExceptionType.cancel) {
+        return; // Ignore cancelled request
+      }
+
       if (!mounted) return;
 
       setState(() {
@@ -418,6 +431,13 @@ class _SearchScrapScreenState extends State<SearchScrapScreen> {
                         isDense: true,
                       ),
                       style: const TextStyle(fontSize: 14),
+                      onSubmitted: (value) {
+                        // Trigger search when Enter is pressed
+                        _searchQuery = value.trim();
+                        _currentPage = 1;
+                        _hasMoreResults = true;
+                        _performSearch();
+                      },
                     ),
                   ),
                 ],
