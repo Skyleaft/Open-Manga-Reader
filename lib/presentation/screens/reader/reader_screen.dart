@@ -1,5 +1,8 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
+import 'package:cached_network_image/cached_network_image.dart';
+import 'dart:async';
+import 'package:flutter/services.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/di/injection.dart';
 import '../../../data/models/progression.dart';
@@ -22,6 +25,7 @@ class _ReaderScreenState extends State<ReaderScreen>
   final ProgressionService _progressionService = getIt<ProgressionService>();
   bool _showUI = true;
   bool _isLoading = false;
+  Timer? _debounceTimer;
   final TransformationController _transformationController =
       TransformationController();
   final ScrollController _scrollController = ScrollController();
@@ -84,12 +88,14 @@ class _ReaderScreenState extends State<ReaderScreen>
 
   void _onScroll() {
     if (!_scrollController.hasClients) return;
+
     final position = _scrollController.position;
     final maxScroll = position.maxScrollExtent;
     final currentScroll = position.pixels;
 
     if (maxScroll > 0) {
       final newProgress = (currentScroll / maxScroll).clamp(0.0, 1.0);
+      // Logika perhitungan halaman yang lebih akurat
       final newPage = ((newProgress * (_pageUrls.length - 1)).round() + 1);
 
       if ((newProgress - _progress).abs() > 0.001 || newPage != _currentPage) {
@@ -98,8 +104,23 @@ class _ReaderScreenState extends State<ReaderScreen>
           _currentPage = newPage;
         });
 
-        // Save progression
-        _saveProgression();
+        // OPTIMASI: Jangan simpan setiap pixel. Gunakan Debouncer (misal: 1 detik setelah berhenti scroll)
+        _debounceSaveProgression();
+      }
+    }
+  }
+
+  void _debounceSaveProgression() {
+    if (_debounceTimer?.isActive ?? false) _debounceTimer!.cancel();
+    _debounceTimer = Timer(const Duration(seconds: 1), () {
+      _saveProgression();
+    });
+  }
+
+  void _precacheNextPages(int currentIndex) {
+    for (int i = 1; i <= 5; i++) {
+      if (currentIndex + i < _pageUrls.length) {
+        precacheImage(NetworkImage(_pageUrls[currentIndex + i]), context);
       }
     }
   }
@@ -239,110 +260,175 @@ class _ReaderScreenState extends State<ReaderScreen>
     }
   }
 
+  void _handleKeyboard(LogicalKeyboardKey key) {
+    if (!_scrollController.hasClients) return;
+
+    final double scrollAmount = 200.0; // Jarak scroll arrow keys
+    final double pageAmount =
+        MediaQuery.of(context).size.height * 0.8; // Jarak PageUp/Down
+    final double currentOffset = _scrollController.offset;
+
+    if (key == LogicalKeyboardKey.arrowDown) {
+      _scrollSmoothly(currentOffset + scrollAmount);
+    } else if (key == LogicalKeyboardKey.arrowUp) {
+      _scrollSmoothly(currentOffset - scrollAmount);
+    } else if (key == LogicalKeyboardKey.pageDown) {
+      _scrollSmoothly(currentOffset + pageAmount);
+    } else if (key == LogicalKeyboardKey.pageUp) {
+      _scrollSmoothly(currentOffset - pageAmount);
+    } else if (key == LogicalKeyboardKey.arrowRight) {
+      _changeChapter(true); // Next Chapter
+    } else if (key == LogicalKeyboardKey.arrowLeft) {
+      _changeChapter(false); // Previous Chapter
+    }
+  }
+
+  void _scrollSmoothly(double target) {
+    final max = _scrollController.position.maxScrollExtent;
+    final min = _scrollController.position.minScrollExtent;
+
+    _scrollController.animateTo(
+      target.clamp(min, max),
+      duration: const Duration(milliseconds: 200),
+      curve: Curves.easeOutCubic,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final screenWidth = MediaQuery.of(context).size.width;
 
-    return Scaffold(
-      backgroundColor: Colors.black,
-      body: Stack(
-        children: [
-          // Content Area
-          Positioned.fill(
-            child: GestureDetector(
-              onTap: _toggleUI,
-              onDoubleTapDown: _handleDoubleTapDown,
-              onDoubleTap: _handleDoubleTap,
-              child: InteractiveViewer(
-                transformationController: _transformationController,
-                minScale: 1.0,
-                maxScale: 5.0,
-                child: _isLoading
-                    ? const Center(
-                        child: CircularProgressIndicator(
-                          color: AppColors.primary,
-                        ),
-                      )
-                    : CustomScrollView(
-                        controller: _scrollController,
-                        physics:
-                            const ClampingScrollPhysics(), // Ensures smooth scrolling behavior
-                        slivers: [
-                          SliverList(
-                            delegate: SliverChildBuilderDelegate((
-                              context,
-                              index,
-                            ) {
-                              final url = _pageUrls[index];
-                              return Image.network(
-                                url,
-                                fit: BoxFit.fitWidth,
-                                width: screenWidth,
-                                loadingBuilder: (context, child, loadingProgress) {
-                                  if (loadingProgress == null) return child;
-                                  return Container(
-                                    height:
-                                        screenWidth *
-                                        1.5, // Estimate height for smoother lazy load
+    return Focus(
+      // Gunakan Focus agar bisa menangkap event keyboard
+      autofocus: true,
+      onKeyEvent: (FocusNode node, KeyEvent event) {
+        if (event is KeyDownEvent) {
+          _handleKeyboard(event.logicalKey);
+        }
+        return KeyEventResult.ignored;
+      },
+      child: Scaffold(
+        backgroundColor: Colors.black,
+        body: Stack(
+          children: [
+            // Content Area
+            Positioned.fill(
+              child: GestureDetector(
+                onTap: _toggleUI,
+                onDoubleTapDown: _handleDoubleTapDown,
+                onDoubleTap: _handleDoubleTap,
+                child: InteractiveViewer(
+                  transformationController: _transformationController,
+                  minScale: 1.0,
+                  maxScale: 5.0,
+                  trackpadScrollCausesScale: false,
+                  child: _isLoading
+                      ? const Center(
+                          child: CircularProgressIndicator(
+                            color: AppColors.primary,
+                          ),
+                        )
+                      : CustomScrollView(
+                          controller: _scrollController,
+                          physics: const ClampingScrollPhysics(),
+                          slivers: [
+                            SliverList(
+                              delegate: SliverChildBuilderDelegate((
+                                context,
+                                index,
+                              ) {
+                                final url = _pageUrls[index];
+
+                                // Trigger precache untuk halaman didepannya
+                                if (index == _currentPage - 1) {
+                                  _precacheNextPages(index);
+                                }
+
+                                return Container(
+                                  width: screenWidth,
+                                  // Memberikan batasan minimal agar tidak jumpy
+                                  constraints: BoxConstraints(
+                                    minHeight: screenWidth,
+                                  ),
+                                  child: CachedNetworkImage(
+                                    imageUrl: url,
+                                    fit: BoxFit.fitWidth,
                                     width: screenWidth,
-                                    color: Colors.black,
-                                    child: const Center(
-                                      child: CircularProgressIndicator(
-                                        color: AppColors.primary,
+                                    // Menggunakan filterQuality rendah saat scroll cepat untuk performa
+                                    filterQuality: FilterQuality.low,
+                                    placeholder: (context, url) => Container(
+                                      height:
+                                          screenWidth *
+                                          1.4, // Rasio standar halaman manga
+                                      width: screenWidth,
+                                      color: Colors.black,
+                                      child: const Center(
+                                        child: CircularProgressIndicator(
+                                          strokeWidth: 2,
+                                        ),
                                       ),
                                     ),
-                                  );
-                                },
-                              );
-                            }, childCount: _pageUrls.length),
-                          ),
-                          // Extra padding element so you can view the bottom
-                          const SliverToBoxAdapter(
-                            child: SizedBox(height: 250),
-                          ),
-                        ],
-                      ),
-              ),
-            ),
-          ),
-
-          // Top Header
-          AnimatedPositioned(
-            duration: const Duration(milliseconds: 300),
-            top: _showUI ? 0 : -150,
-            left: 0,
-            right: 0,
-            child: _buildFloatingTopUI(),
-          ),
-
-          // Bottom Bar
-          AnimatedPositioned(
-            duration: const Duration(milliseconds: 300),
-            bottom: _showUI ? 20 : -350,
-            left: 20,
-            right: 20,
-            child: _buildFloatingBottomUI(),
-          ),
-
-          // Mini Progress Bar
-          Positioned(
-            left: 16,
-            right: 16,
-            bottom: 16,
-            child: AnimatedOpacity(
-              duration: const Duration(milliseconds: 300),
-              opacity: _showUI ? 0 : 1,
-              child: LinearProgressIndicator(
-                value: _progress,
-                backgroundColor: Colors.white10,
-                valueColor: const AlwaysStoppedAnimation<Color>(
-                  AppColors.primary,
+                                    errorWidget: (context, url, error) =>
+                                        Container(
+                                          height: 200,
+                                          color: Colors.grey[900],
+                                          child: const Icon(
+                                            Icons.broken_image,
+                                            color: Colors.white24,
+                                          ),
+                                        ),
+                                  ),
+                                );
+                              }, childCount: _pageUrls.length),
+                            ),
+                            const SliverToBoxAdapter(
+                              child: SizedBox(height: 100),
+                            ),
+                          ],
+                        ),
                 ),
-                minHeight: 2,
               ),
             ),
-          ),
-        ],
+
+            // Top Header
+            AnimatedPositioned(
+              duration: const Duration(milliseconds: 300),
+              top: _showUI ? 0 : -150,
+              left: 0,
+              right: 0,
+              child: _buildFloatingTopUI(),
+            ),
+
+            // Bottom Bar
+            AnimatedPositioned(
+              duration: const Duration(milliseconds: 300),
+              bottom: _showUI ? 20 : -350,
+              left: 20,
+              right: 20,
+              child: _buildFloatingBottomUI(),
+            ),
+
+            // Mini Progress Bar
+            Positioned(
+              left: 16,
+              right: 16,
+              bottom: 16,
+              child: AnimatedOpacity(
+                duration: const Duration(milliseconds: 300),
+                opacity: _showUI ? 0 : 1,
+                child: LinearProgressIndicator(
+                  value: _progress,
+                  borderRadius: BorderRadius.circular(16),
+                  backgroundColor: Colors.white10,
+                  valueColor: const AlwaysStoppedAnimation<Color>(
+                    AppColors.primary,
+                  ),
+                  minHeight: 6,
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
