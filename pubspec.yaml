@@ -23,7 +23,7 @@ dependencies:
   url_launcher: ^6.3.1
   uuid: ^4.5.3
   provider: ^6.1.2
-  smart_cached_network_image: ^1.0.0
+  cached_network_image_ce: ^4.6.2
 
 dev_dependencies:
   flutter_test:

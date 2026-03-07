@@ -1,6 +1,5 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
-import 'package:smart_cached_network_image/smart_cached_network_image.dart';
 import 'dart:async';
 import 'package:flutter/services.dart';
 import '../../../core/constants/app_colors.dart';
@@ -10,7 +9,9 @@ import '../../../data/models/reader_content.dart';
 import '../../../data/services/manga_api_service.dart';
 import '../../../data/services/progression_service.dart';
 import 'widgets/app_network_image.dart';
-import 'package:flutter/foundation.dart';
+import 'widgets/reader_header.dart';
+import 'widgets/reader_bottom_bar.dart';
+import 'widgets/reader_content.dart';
 
 class ReaderScreen extends StatefulWidget {
   final ReaderContent content;
@@ -89,7 +90,8 @@ class _ReaderScreenState extends State<ReaderScreen>
   }
 
   void _onTransformationChanged() {
-    // Left empty for now, we'll track progress differently
+    // Update UI state when transformation changes
+    setState(() {});
   }
 
   void _onScroll() {
@@ -225,8 +227,8 @@ class _ReaderScreenState extends State<ReaderScreen>
       final y = -position.dy * (targetScale - 1);
 
       final targetMatrix = Matrix4.identity()
-        ..translate(x, y)
-        ..scale(targetScale);
+        ..translate(x, y, 0.0)
+        ..scale(targetScale, targetScale, 1.0);
 
       _animateTo(targetMatrix, duration: const Duration(milliseconds: 250));
     }
@@ -292,8 +294,6 @@ class _ReaderScreenState extends State<ReaderScreen>
 
   @override
   Widget build(BuildContext context) {
-    final screenWidth = MediaQuery.of(context).size.width;
-
     return Focus(
       // Gunakan Focus agar bisa menangkap event keyboard
       autofocus: true,
@@ -308,72 +308,16 @@ class _ReaderScreenState extends State<ReaderScreen>
         body: Stack(
           children: [
             // Content Area
-            Positioned.fill(
-              child: GestureDetector(
-                onTap: _toggleUI,
-                onDoubleTapDown: _handleDoubleTapDown,
-                onDoubleTap: _handleDoubleTap,
-                child: InteractiveViewer(
-                  transformationController: _transformationController,
-                  minScale: 1.0,
-                  maxScale: 5.0,
-                  trackpadScrollCausesScale: false,
-                  child: _isLoading
-                      ? const Center(
-                          child: CircularProgressIndicator(
-                            color: AppColors.primary,
-                          ),
-                        )
-                      : CustomScrollView(
-                          controller: _scrollController,
-                          cacheExtent: 5000,
-                          physics: const ClampingScrollPhysics(),
-                          slivers: [
-                            SliverList(
-                              delegate: SliverChildBuilderDelegate(
-                                (context, index) {
-                                  final url = _pageUrls[index];
-
-                                  return Container(
-                                    width: screenWidth,
-                                    child: AppNetworkImage(
-                                      imageUrl: url,
-                                      fit: BoxFit.fitWidth,
-                                      width: screenWidth,
-                                      gaplessPlayback: true,
-                                      placeholder: Container(
-                                        height: screenWidth * 1.4,
-                                        width: screenWidth,
-                                        color: Colors.black,
-                                        child: const Center(
-                                          child: CircularProgressIndicator(
-                                            strokeWidth: 2,
-                                          ),
-                                        ),
-                                      ),
-                                      errorWidget: Container(
-                                        height: 200,
-                                        color: Colors.black,
-                                        child: const Icon(
-                                          Icons.broken_image,
-                                          color: Colors.white24,
-                                        ),
-                                      ),
-                                    ),
-                                  );
-                                },
-                                childCount: _pageUrls.isEmpty
-                                    ? 0
-                                    : _pageUrls.length,
-                              ),
-                            ),
-                            const SliverToBoxAdapter(
-                              child: SizedBox(height: 100),
-                            ),
-                          ],
-                        ),
-                ),
-              ),
+            ReaderContentWidget(
+              pageUrls: _pageUrls,
+              isLoading: _isLoading,
+              showUI: _showUI,
+              transformationController: _transformationController,
+              scrollController: _scrollController,
+              onTap: _toggleUI,
+              onDoubleTapDown: _handleDoubleTapDown,
+              onDoubleTap: _handleDoubleTap,
+              onToggleUI: _toggleUI,
             ),
 
             // Top Header
@@ -382,7 +326,12 @@ class _ReaderScreenState extends State<ReaderScreen>
               top: _showUI ? 0 : -150,
               left: 0,
               right: 0,
-              child: _buildFloatingTopUI(),
+              child: ReaderHeader(
+                mangaTitle: widget.content.mangaTitle,
+                chapterTitle: _chapterTitle,
+                onBack: () => Navigator.pop(context),
+                onSettings: () {},
+              ),
             ),
 
             // Bottom Bar
@@ -391,7 +340,42 @@ class _ReaderScreenState extends State<ReaderScreen>
               bottom: _showUI ? 20 : -350,
               left: 20,
               right: 20,
-              child: _buildFloatingBottomUI(),
+              child: ReaderBottomBar(
+                progress: _progress,
+                currentPage: _currentPage,
+                totalPages: _pageUrls.length,
+                isSliderScrolling: _isSliderScrolling,
+                onProgressChanged: (value) {
+                  setState(() {
+                    _progress = value;
+                    if (_pageUrls.isEmpty) return;
+
+                    _currentPage =
+                        ((value * (_pageUrls.length - 1)).round() + 1).clamp(
+                          1,
+                          _pageUrls.length,
+                        );
+                  });
+
+                  if (_scrollController.hasClients) {
+                    final maxScroll =
+                        _scrollController.position.maxScrollExtent;
+                    final target = value * maxScroll;
+
+                    if (maxScroll > 0) {
+                      _scrollController.jumpTo(target.clamp(0, maxScroll));
+                    }
+                  }
+                },
+                onProgressChangeStart: (_) {
+                  _isSliderScrolling = true;
+                },
+                onProgressChangeEnd: (_) {
+                  _isSliderScrolling = false;
+                },
+                onNextChapter: () => _changeChapter(true),
+                onPreviousChapter: () => _changeChapter(false),
+              ),
             ),
 
             // Mini Progress Bar
@@ -415,202 +399,6 @@ class _ReaderScreenState extends State<ReaderScreen>
             ),
           ],
         ),
-      ),
-    );
-  }
-
-  Widget _buildFloatingTopUI() {
-    return ClipRect(
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-        child: Container(
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topCenter,
-              end: Alignment.bottomCenter,
-              colors: [
-                Colors.black.withValues(alpha: 0.8),
-                Colors.black.withValues(alpha: 0.0),
-              ],
-            ),
-          ),
-          child: SafeArea(
-            bottom: false,
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              child: Row(
-                children: [
-                  _buildGlassIconButton(
-                    Icons.arrow_back,
-                    () => Navigator.pop(context),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 16,
-                        vertical: 8,
-                      ),
-                      decoration: BoxDecoration(
-                        color: Colors.black.withValues(alpha: 0.5),
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(color: Colors.white10),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Text(
-                            widget.content.mangaTitle,
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontWeight: FontWeight.bold,
-                              fontSize: 14,
-                            ),
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                          Text(
-                            _chapterTitle,
-                            style: TextStyle(
-                              color: Colors.white.withOpacity(0.6),
-                              fontSize: 11,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  _buildGlassIconButton(Icons.settings_outlined, () {}),
-                ],
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildFloatingBottomUI() {
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(32),
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
-        child: Container(
-          padding: const EdgeInsets.fromLTRB(16, 4, 16, 12),
-          decoration: BoxDecoration(
-            color: const Color.fromARGB(255, 45, 45, 45).withValues(alpha: 0.7),
-            borderRadius: BorderRadius.circular(32),
-            border: Border.all(color: Colors.white.withOpacity(0.1)),
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              // Slider Row
-              Row(
-                children: [
-                  IconButton(
-                    icon: const Icon(
-                      Icons.skip_previous_rounded,
-                      color: Colors.white70,
-                      size: 20,
-                    ),
-                    onPressed: () => _changeChapter(false),
-                    visualDensity: VisualDensity.compact,
-                  ),
-                  Expanded(
-                    child: SliderTheme(
-                      data: SliderTheme.of(context).copyWith(
-                        trackHeight: 2,
-                        activeTrackColor: AppColors.primary,
-                        inactiveTrackColor: Colors.white10,
-                        thumbColor: Colors.white,
-                        thumbShape: const RoundSliderThumbShape(
-                          enabledThumbRadius: 6,
-                        ),
-                        overlayShape: const RoundSliderOverlayShape(
-                          overlayRadius: 14,
-                        ),
-                      ),
-                      child: Slider(
-                        value: _progress,
-                        onChangeStart: (_) {
-                          _isSliderScrolling = true;
-                        },
-                        onChanged: (value) {
-                          setState(() {
-                            _progress = value;
-                            if (_pageUrls.isEmpty) return;
-
-                            _currentPage =
-                                ((value * (_pageUrls.length - 1)).round() + 1)
-                                    .clamp(1, _pageUrls.length);
-                          });
-
-                          if (_scrollController.hasClients) {
-                            final maxScroll =
-                                _scrollController.position.maxScrollExtent;
-                            final target = value * maxScroll;
-
-                            if (maxScroll > 0) {
-                              _scrollController.jumpTo(
-                                target.clamp(0, maxScroll),
-                              );
-                            }
-                          }
-                        },
-                        onChangeEnd: (_) {
-                          _isSliderScrolling = false;
-                        },
-                      ),
-                    ),
-                  ),
-                  IconButton(
-                    icon: const Icon(
-                      Icons.skip_next_rounded,
-                      color: Colors.white70,
-                      size: 20,
-                    ),
-                    onPressed: () => _changeChapter(true),
-                    visualDensity: VisualDensity.compact,
-                  ),
-                ],
-              ),
-              // Info Row
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 12),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Text(
-                      'PAGE $_currentPage OF ${_pageUrls.length}  •  ${(_progress * 100).toInt()}%',
-                      style: const TextStyle(
-                        color: Colors.white60,
-                        fontSize: 10,
-                        fontWeight: FontWeight.bold,
-                        letterSpacing: 0.5,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildGlassIconButton(IconData icon, VoidCallback onTap) {
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.black.withOpacity(0.5),
-        shape: BoxShape.circle,
-        border: Border.all(color: Colors.white10),
-      ),
-      child: IconButton(
-        icon: Icon(icon, color: Colors.white, size: 20),
-        onPressed: onTap,
       ),
     );
   }

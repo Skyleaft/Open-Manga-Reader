@@ -1,13 +1,13 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:smart_cached_network_image/smart_cached_network_image.dart';
+import 'package:cached_network_image_ce/cached_network_image.dart';
 
 class AppNetworkImage extends StatelessWidget {
   final String imageUrl;
   final BoxFit fit;
   final double? width;
-  final Widget? placeholder;
-  final Widget? errorWidget;
+  final Widget placeholder;
+  final Widget errorWidget;
   final bool gaplessPlayback;
 
   const AppNetworkImage({
@@ -15,8 +15,8 @@ class AppNetworkImage extends StatelessWidget {
     required this.imageUrl,
     this.fit = BoxFit.cover,
     this.width,
-    this.placeholder,
-    this.errorWidget,
+    required this.placeholder,
+    required this.errorWidget,
     this.gaplessPlayback = true,
   });
 
@@ -40,15 +40,13 @@ class AppNetworkImage extends StatelessWidget {
         },
       );
     }
-
     // MOBILE
-    return SmartCachedNetworkImage(
+    return CachedNetworkImage(
       imageUrl: imageUrl,
       fit: fit,
       width: width,
-      gaplessPlayback: gaplessPlayback,
-      placeholder: placeholder,
-      errorWidget: errorWidget,
+      placeholder: (context, url) => placeholder,
+      errorWidget: (context, url, error) => errorWidget,
     );
   }
 }
