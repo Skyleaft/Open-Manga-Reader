@@ -169,6 +169,9 @@ class _ReaderScreenState extends State<ReaderScreen>
         targetChapter.chapterNumber,
       );
 
+      // Clear live images to allow eviction of previous chapter images
+      PaintingBinding.instance.imageCache.clearLiveImages();
+
       setState(() {
         _pageUrls = pages
             .map(

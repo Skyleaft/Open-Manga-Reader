@@ -54,7 +54,7 @@ class ReaderContentWidget extends StatelessWidget {
                 trackpadScrollCausesScale: false,
                 child: CustomScrollView(
                   controller: scrollController,
-                  cacheExtent: 5000,
+                  cacheExtent: 3000,
                   physics:
                       transformationController.value.getMaxScaleOnAxis() > 1
                       ? const NeverScrollableScrollPhysics()
