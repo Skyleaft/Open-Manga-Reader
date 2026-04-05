@@ -1,10 +1,12 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../data/models/manga_summary.dart';
 import '../../../data/models/manga_detail.dart';
 import '../../../data/services/manga_api_service.dart';
 import '../../../data/services/progression_service.dart';
+import '../../../data/services/auth_service.dart';
 import '../../../core/di/injection.dart';
 import '../../../routes/app_pages.dart';
 import '../discover/discover_screen.dart';
@@ -46,7 +48,7 @@ class _HomeScreenState extends State<HomeScreen> {
   Future<void> _fetchTrending() async {
     try {
       final response = await _apiService.getPagedManga(
-        sortBy: 'popularity',
+        sortBy: 'totalView',
         orderBy: 'desc',
         pageSize: 10,
       );
@@ -205,63 +207,21 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildHeader(BuildContext context, bool isDark) {
+    final authService = Provider.of<AuthService>(context, listen: false);
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
       child: Row(
         children: [
           Expanded(
-            child: Container(
-              height: 48,
-              decoration: BoxDecoration(
-                color: AppColors.primary.withOpacity(isDark ? 0.05 : 0.1),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: TextField(
-                onSubmitted: (value) {
-                  if (value.isNotEmpty) {
-                    if (widget.onNavigateToDiscover != null) {
-                      widget.onNavigateToDiscover!(search: value);
-                    } else {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) =>
-                              DiscoverScreen(initialSearch: value),
-                        ),
-                      );
-                    }
-                  }
-                },
-                decoration: const InputDecoration(
-                  hintText: 'Search manga...',
-                  prefixIcon: Icon(Icons.search, color: Colors.grey),
-                  border: InputBorder.none,
-                  contentPadding: EdgeInsets.symmetric(vertical: 12),
-                ),
+            child: Text(
+              'Open Manga Reader',
+              style: TextStyle(
+                fontSize: 24,
+                fontWeight: FontWeight.w900,
+                letterSpacing: -0.5,
+                color: isDark ? Colors.white : AppColors.secondary,
               ),
             ),
-          ),
-          const SizedBox(width: 12),
-          Stack(
-            children: [
-              IconButton(
-                onPressed: () {},
-                icon: const Icon(Icons.notifications_none),
-                color: isDark ? Colors.white70 : Colors.black87,
-              ),
-              Positioned(
-                top: 12,
-                right: 12,
-                child: Container(
-                  width: 8,
-                  height: 8,
-                  decoration: const BoxDecoration(
-                    color: AppColors.primary,
-                    shape: BoxShape.circle,
-                  ),
-                ),
-              ),
-            ],
           ),
           const SizedBox(width: 8),
           GestureDetector(
@@ -277,9 +237,10 @@ class _HomeScreenState extends State<HomeScreen> {
                   color: AppColors.primary.withOpacity(0.2),
                   width: 2,
                 ),
-                image: const DecorationImage(
+                image: DecorationImage(
                   image: NetworkImage(
-                    'https://lh3.googleusercontent.com/aida-public/AB6AXuAOmebCcL-tBf75LvGc6ipwfwsOuoOk0JHFI9_-bxtFtzxg-Gvn9k6VI8MliWvYzLg-xAeQ0SagmyxKKE1Z_36s2wkff5JPgMEk5XhogzNBDh-vl1XFdn6pGT9Spt-6zIdcPzfQewpZYs-2jpZ_47qkNM163fNM3IqQYOQzFQcEA10umHVOHOxSCj7ZoHIeGZ-VAH5EcWQiV9sXiomk3tZR36v18pacx1xwmqmWlEo7MrOgSh2JYUQwJxqkICkhRDy2n0dALOilShrw',
+                    authService.currentUser?.photoURL ??
+                        'https://lh3.googleusercontent.com/aida-public/AB6AXuAOmebCcL-tBf75LvGc6ipwfwsOuoOk0JHFI9_-bxtFtzxg-Gvn9k6VI8MliWvYzLg-xAeQ0SagmyxKKE1Z_36s2wkff5JPgMEk5XhogzNBDh-vl1XFdn6pGT9Spt-6zIdcPzfQewpZYs-2jpZ_47qkNM163fNM3IqQYOQzFQcEA10umHVOHOxSCj7ZoHIeGZ-VAH5EcWQiV9sXiomk3tZR36v18pacx1xwmqmWlEo7MrOgSh2JYUQwJxqkICkhRDy2n0dALOilShrw',
                   ),
                   fit: BoxFit.cover,
                 ),
@@ -307,13 +268,13 @@ class _HomeScreenState extends State<HomeScreen> {
               TextButton(
                 onPressed: () {
                   if (widget.onNavigateToDiscover != null) {
-                    widget.onNavigateToDiscover!(sortBy: 'popularity');
+                    widget.onNavigateToDiscover!(sortBy: 'totalView');
                   } else {
                     Navigator.push(
                       context,
                       MaterialPageRoute(
                         builder: (context) =>
-                            const DiscoverScreen(sortBy: 'popularity'),
+                            const DiscoverScreen(sortBy: 'totalView'),
                       ),
                     );
                   }

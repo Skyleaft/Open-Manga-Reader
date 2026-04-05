@@ -1,25 +1,24 @@
 class QueueItem {
   final String id;
-  final String mangaTitle;
-  final double chapterNumber;
-  final String status;
-  final DateTime queuedAt;
+  final String jobName;
+  final String state;
+  final DateTime createdAt;
 
   QueueItem({
     required this.id,
-    required this.mangaTitle,
-    required this.chapterNumber,
-    required this.status,
-    required this.queuedAt,
+    required this.jobName,
+    required this.state,
+    required this.createdAt,
   });
 
   factory QueueItem.fromJson(Map<String, dynamic> json) {
     return QueueItem(
-      id: json['id'] as String,
-      mangaTitle: json['mangaTitle'] as String,
-      chapterNumber: (json['chapterNumber'] as num).toDouble(),
-      status: json['status'] as String,
-      queuedAt: DateTime.parse(json['queuedAt'] as String),
+      id: json['id'] as String? ?? 'unknown',
+      jobName: json['jobName'] as String? ?? 'Unknown Job',
+      state: json['state'] as String? ?? 'Pending',
+      createdAt: json['createdAt'] != null
+          ? DateTime.parse(json['createdAt'] as String)
+          : DateTime.now(),
     );
   }
 }

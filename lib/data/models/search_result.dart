@@ -7,6 +7,8 @@ class SearchResult {
   final String lastUpdateText;
   final double latestChapterNumber;
   final DateTime? latestScrapped;
+  final String? mangaId;
+  final double? currentChapterNumber;
 
   SearchResult({
     required this.title,
@@ -17,6 +19,8 @@ class SearchResult {
     required this.lastUpdateText,
     required this.latestChapterNumber,
     this.latestScrapped,
+    this.mangaId,
+    this.currentChapterNumber,
   });
 
   factory SearchResult.fromJson(Map<String, dynamic> json) {
@@ -32,6 +36,8 @@ class SearchResult {
       latestScrapped: json['latestScrapped'] != null
           ? DateTime.parse(json['latestScrapped'] as String)
           : null,
+      mangaId: json['mangaId'] as String?,
+      currentChapterNumber: (json['currentChapterNumber'] as num?)?.toDouble(),
     );
   }
 
@@ -45,6 +51,8 @@ class SearchResult {
       'lastUpdateText': lastUpdateText,
       'latestChapterNumber': latestChapterNumber,
       'latestScrapped': latestScrapped?.toIso8601String(),
+      'mangaId': mangaId,
+      'currentChapterNumber': currentChapterNumber,
     };
   }
 }

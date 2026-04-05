@@ -85,12 +85,12 @@ class _DiscoverHeaderState extends State<DiscoverHeader> {
                 children: [
                   _buildHeaderIconButton(
                     onPressed: widget.onSearchScrapSource,
-                    icon: Icons.search_outlined,
+                    icon: Icons.cloud_sync_outlined,
                   ),
                   const SizedBox(width: 8),
                   _buildHeaderIconButton(
                     onPressed: widget.onShowQueue,
-                    icon: Icons.notifications_none,
+                    icon: Icons.receipt_long_outlined,
                   ),
                 ],
               ),
@@ -111,6 +111,8 @@ class _DiscoverHeaderState extends State<DiscoverHeader> {
                   child: TextField(
                     controller: _searchController,
                     onChanged: _debounceSearch,
+                    onTapOutside: (_) =>
+                        FocusManager.instance.primaryFocus?.unfocus(),
                     style: TextStyle(
                       color: widget.isDark ? Colors.white : Colors.black87,
                       fontSize: 15,

@@ -141,10 +141,7 @@ class MangaApiService {
     try {
       final response = await _dio.post(
         '/api/manga/recommendations',
-        data: {
-          'readingHistoryIds': readingHistoryIds ?? [],
-          'limit': limit,
-        },
+        data: {'readingHistoryIds': readingHistoryIds ?? [], 'limit': limit},
       );
 
       final List<dynamic> items = response.data['items'];
@@ -333,8 +330,7 @@ class MangaApiService {
           .map((e) => e as Map<String, dynamic>)
           .toList();
     } catch (e) {
-      // Return empty list if unauthorized or error
-      return [];
+      rethrow;
     }
   }
 
@@ -366,8 +362,7 @@ class MangaApiService {
           .map((e) => e as Map<String, dynamic>)
           .toList();
     } catch (e) {
-      // Return empty list if unauthorized or error
-      return [];
+      rethrow;
     }
   }
 

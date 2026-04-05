@@ -8,6 +8,7 @@ import 'package:cached_network_image_ce/cached_network_image.dart';
 import '../../../data/models/manga_detail.dart';
 import '../../../data/models/progression.dart';
 import '../../../data/services/manga_api_service.dart';
+import '../../../data/services/manga_detail_service.dart';
 import '../../../data/services/progression_service.dart';
 import '../../../routes/app_pages.dart';
 
@@ -25,8 +26,9 @@ class HistoryScreen extends StatefulWidget {
 class _HistoryScreenState extends State<HistoryScreen> {
   final ProgressionService _progressionService = getIt<ProgressionService>();
   final MangaApiService _apiService = getIt<MangaApiService>();
+  final MangaDetailService _detailService = getIt<MangaDetailService>();
   List<MangaProgression> _progressions = [];
-  List<MangaDetail> _mangaDetails = [];
+  List<MangaDetail?> _mangaDetails = [];
   bool _isLoading = true;
 
   @override
@@ -48,17 +50,29 @@ class _HistoryScreenState extends State<HistoryScreen> {
       }
 
       // Fetch manga details for each progression
-      final details = <MangaDetail>[];
+      final details = <MangaDetail?>[];
       for (final progression in progressions) {
         try {
-          final detailData = await _apiService.getMangaDetail(
-            progression.mangaId,
-          );
-          final mangaDetail = MangaDetail.fromMap(detailData);
-          details.add(mangaDetail);
+          final cached = await _detailService.getDetail(progression.mangaId);
+          if (cached != null) {
+            details.add(cached);
+
+            // Sync in background to keep data fresh without blocking UI
+            _apiService.getMangaDetail(progression.mangaId).then((data) {
+              final fresh = MangaDetail.fromMap(data);
+              _detailService.saveDetail(fresh);
+            }).catchError((_) {});
+          } else {
+            final detailData = await _apiService.getMangaDetail(
+              progression.mangaId,
+            );
+            final mangaDetail = MangaDetail.fromMap(detailData);
+            await _detailService.saveDetail(mangaDetail);
+            details.add(mangaDetail);
+          }
         } catch (e) {
-          // Skip manga that can't be loaded
-          continue;
+          // Add null to keep the lists aligned!
+          details.add(null);
         }
       }
 

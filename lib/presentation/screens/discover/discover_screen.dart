@@ -110,7 +110,9 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
   }
 
   void _onSearch(String value) {
-    _searchQuery = value.isEmpty ? null : value;
+    final newQuery = value.isEmpty ? null : value;
+    if (_searchQuery == newQuery) return;
+    _searchQuery = newQuery;
     _fetchData(refresh: true);
   }
 
@@ -295,11 +297,15 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
 
                             final mangaDetail = MangaDetail.fromMap(detailData);
 
-                            Navigator.pushNamed(
+                            await Navigator.pushNamed(
                               context,
                               AppRoutes.detail,
                               arguments: mangaDetail,
                             );
+
+                            if (mounted) {
+                              FocusManager.instance.primaryFocus?.unfocus();
+                            }
                           } catch (e) {
                             if (!mounted) return;
                             Navigator.pop(context);

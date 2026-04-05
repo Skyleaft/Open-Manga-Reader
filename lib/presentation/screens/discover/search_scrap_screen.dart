@@ -7,6 +7,7 @@ import 'package:my_manga_reader/routes/app_pages.dart';
 import 'package:my_manga_reader/data/models/search_result.dart';
 import 'dart:async';
 import 'package:dio/dio.dart';
+import 'widgets/search_scrap_card.dart';
 
 class SearchScrapScreen extends StatefulWidget {
   const SearchScrapScreen({super.key});
@@ -147,7 +148,90 @@ class _SearchScrapScreenState extends State<SearchScrapScreen> {
     }
   }
 
-  Future<void> _scrapManga(String mangaUrl) async {
+  void _showScrapModal(SearchResult item) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Theme.of(context).brightness == Brightness.dark
+          ? AppColors.backgroundDark
+          : AppColors.backgroundLight,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) {
+        final isDark = Theme.of(context).brightness == Brightness.dark;
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Scrap Manga',
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                    color: isDark ? Colors.white : AppColors.primary,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  item.title,
+                  style: TextStyle(
+                    color: isDark ? Colors.grey[400] : Colors.grey[700],
+                    fontSize: 14,
+                  ),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(height: 24),
+
+                // Option 1: Metadata only
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: CircleAvatar(
+                    backgroundColor: AppColors.primary.withOpacity(0.1),
+                    child: const Icon(
+                      Icons.info_outline,
+                      color: AppColors.primary,
+                    ),
+                  ),
+                  title: const Text('Scrap Metadata Only'),
+                  subtitle: const Text(
+                    'Fastest. Gets manga details and chapter list only.',
+                  ),
+                  onTap: () {
+                    Navigator.pop(context);
+                    _executeScrap(item.detailUrl, false);
+                  },
+                ),
+                const Divider(height: 1),
+
+                // Option 2: All chapters
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: CircleAvatar(
+                    backgroundColor: Colors.orange.withOpacity(0.1),
+                    child: const Icon(Icons.download, color: Colors.orange),
+                  ),
+                  title: const Text('Scrap All Chapters'),
+                  subtitle: const Text(
+                    'Slower. Downloads all chapter pages in the background.',
+                  ),
+                  onTap: () {
+                    Navigator.pop(context);
+                    _executeScrap(item.detailUrl, true);
+                  },
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Future<void> _executeScrap(String mangaUrl, bool scrapChapters) async {
     try {
       showDialog(
         context: context,
@@ -157,19 +241,29 @@ class _SearchScrapScreenState extends State<SearchScrapScreen> {
         ),
       );
 
-      await _apiService.scrapManga(mangaUrl, false, _selectedProviderName);
+      await _apiService.scrapManga(
+        mangaUrl,
+        scrapChapters,
+        _selectedProviderName,
+      );
 
       if (!mounted) return;
 
-      Navigator.pop(context);
+      Navigator.pop(context); // pop loading dialog
 
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Scraping added to queue!')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            scrapChapters
+                ? 'Added to queue: Scraping all chapters...'
+                : 'Added to queue: Scraping metadata...',
+          ),
+        ),
+      );
     } catch (e) {
       if (!mounted) return;
 
-      Navigator.pop(context);
+      Navigator.pop(context); // pop loading dialog
 
       ScaffoldMessenger.of(
         context,
@@ -344,7 +438,7 @@ class _SearchScrapScreenState extends State<SearchScrapScreen> {
           onPressed: () => Navigator.pop(context),
         ),
         title: Text(
-          'Search Manga',
+          'Search From Source',
           style: TextStyle(
             color: textColor,
             fontSize: 18,
@@ -547,11 +641,6 @@ class _SearchScrapScreenState extends State<SearchScrapScreen> {
 
   Widget _buildResultsList() {
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
-    final cardColor = isDarkMode ? AppColors.cardDark : Colors.white;
-    final textColor = isDarkMode ? Colors.white : AppColors.primary;
-    final shadowColor = isDarkMode
-        ? Colors.white.withOpacity(0.1)
-        : Colors.black.withOpacity(0.1);
 
     return NotificationListener<ScrollNotification>(
       onNotification: (notification) {
@@ -571,12 +660,10 @@ class _SearchScrapScreenState extends State<SearchScrapScreen> {
         itemBuilder: (context, index) {
           if (index < _searchResults.length) {
             final item = _searchResults[index];
-            return _buildResultCard(
-              item,
-              isDarkMode,
-              cardColor,
-              textColor,
-              shadowColor,
+            return SearchScrapCard(
+              item: item,
+              isDarkMode: isDarkMode,
+              onScrap: () => _showScrapModal(item),
             );
           } else {
             // Loading indicator at the bottom
@@ -588,180 +675,6 @@ class _SearchScrapScreenState extends State<SearchScrapScreen> {
             );
           }
         },
-      ),
-    );
-  }
-
-  Widget _buildResultCard(
-    SearchResult item,
-    bool isDarkMode,
-    Color cardColor,
-    Color textColor,
-    Color shadowColor,
-  ) {
-    return Card(
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      elevation: 2,
-      color: cardColor,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(12),
-        onTap: () => _scrapManga(item.detailUrl),
-        child: Container(
-          padding: const EdgeInsets.all(12),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Thumbnail
-              ClipRRect(
-                borderRadius: BorderRadius.circular(8),
-                child: item.thumbnail.isNotEmpty
-                    ? Image.network(
-                        item.thumbnail,
-                        width: 80,
-                        height: 110,
-                        fit: BoxFit.cover,
-                        errorBuilder: (_, __, ___) => Container(
-                          width: 80,
-                          height: 110,
-                          color: isDarkMode
-                              ? Colors.grey[700]
-                              : Colors.grey[300],
-                          child: Icon(
-                            Icons.broken_image,
-                            color: isDarkMode ? Colors.grey[400] : Colors.grey,
-                          ),
-                        ),
-                      )
-                    : Container(
-                        width: 80,
-                        height: 110,
-                        color: isDarkMode ? Colors.grey[700] : Colors.grey[300],
-                        child: Icon(
-                          Icons.image,
-                          color: isDarkMode ? Colors.grey[400] : Colors.grey,
-                        ),
-                      ),
-              ),
-
-              const SizedBox(width: 12),
-
-              // Details
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisAlignment: MainAxisAlignment.start,
-                  children: [
-                    Text(
-                      item.title,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 14,
-                        color: textColor,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      item.type,
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: isDarkMode ? Colors.grey[400] : Colors.grey,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      item.genre,
-                      style: TextStyle(
-                        fontSize: 11,
-                        color: isDarkMode ? Colors.grey[400] : Colors.grey,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    if (item.lastUpdateText.isNotEmpty)
-                      Text(
-                        item.lastUpdateText,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          fontSize: 11,
-                          color: isDarkMode ? Colors.brown[200] : Colors.brown,
-                        ),
-                      ),
-                    const SizedBox(height: 4),
-                    Row(
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 6,
-                            vertical: 2,
-                          ),
-                          decoration: BoxDecoration(
-                            color: AppColors.primary.withOpacity(0.2),
-                            borderRadius: BorderRadius.circular(4),
-                          ),
-                          child: Text(
-                            'Ch. ${item.latestChapterNumber.toInt()}',
-                            style: const TextStyle(
-                              fontSize: 10,
-                              color: AppColors.primary,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        if (item.latestScrapped != null)
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 6,
-                              vertical: 2,
-                            ),
-                            decoration: BoxDecoration(
-                              color: Colors.green.withOpacity(0.2),
-                              borderRadius: BorderRadius.circular(4),
-                            ),
-                            child: Text(
-                              'Updated',
-                              style: const TextStyle(
-                                fontSize: 10,
-                                color: Colors.green,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-
-              // Action Button
-              Column(
-                mainAxisAlignment: MainAxisAlignment.end,
-                children: [
-                  ElevatedButton(
-                    onPressed: item.detailUrl.isNotEmpty
-                        ? () => _scrapManga(item.detailUrl)
-                        : null,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.primary,
-                      foregroundColor: Colors.white,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(6),
-                      ),
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 8,
-                      ),
-                    ),
-                    child: const Text('SCRAP', style: TextStyle(fontSize: 12)),
-                  ),
-                ],
-              ),
-            ],
-          ),
-        ),
       ),
     );
   }
