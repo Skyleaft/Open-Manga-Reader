@@ -4,6 +4,8 @@ import '../library/library_screen.dart';
 import '../discover/discover_screen.dart';
 import '../more/more_screen.dart';
 import '../../../core/widgets/app_bottom_nav.dart';
+import '../../../data/services/update_service.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class MainScreen extends StatefulWidget {
   const MainScreen({super.key});
@@ -35,6 +37,53 @@ class _MainScreenState extends State<MainScreen> with TickerProviderStateMixin {
     _animationController = AnimationController(
       duration: const Duration(milliseconds: 300),
       vsync: this,
+    );
+    _checkForUpdate();
+  }
+
+  Future<void> _checkForUpdate() async {
+    final updateService = UpdateService();
+    final updateData = await updateService.checkForUpdate();
+    
+    if (updateData != null && mounted) {
+      _showUpdateDialog(updateData);
+    }
+  }
+
+  void _showUpdateDialog(Map<String, dynamic> updateData) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Update Available!'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('A new version (${updateData['version']}) is available.'),
+            const SizedBox(height: 8),
+            Text(
+              updateData['body'] ?? 'Performance improvements and bug fixes.',
+              maxLines: 5,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(fontSize: 12, color: Colors.grey),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+             onPressed: () => Navigator.pop(context),
+             child: const Text('Later'),
+          ),
+          ElevatedButton(
+             onPressed: () {
+               Navigator.pop(context);
+               final url = Uri.parse(updateData['url']);
+               launchUrl(url, mode: LaunchMode.externalApplication);
+             },
+             child: const Text('Update Now'),
+          ),
+        ],
+      ),
     );
   }
 

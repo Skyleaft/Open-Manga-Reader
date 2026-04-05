@@ -25,6 +25,7 @@ dependencies:
   provider: ^6.1.2
   cached_network_image_ce: ^4.6.4
   animated_icon: ^1.0.0
+  package_info_plus: ^8.1.1
 
 dev_dependencies:
   flutter_test:
