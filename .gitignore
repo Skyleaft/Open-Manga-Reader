@@ -46,3 +46,5 @@ app.*.map.json
 
 # Environment secrets
 .env
+google-services.json
+GoogleService-Info.plist
