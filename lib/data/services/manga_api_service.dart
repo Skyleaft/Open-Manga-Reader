@@ -97,7 +97,11 @@ class MangaApiService {
   }
 
   void updateBaseUrl(String newUrl) {
-    _dio.options.baseUrl = newUrl;
+    String sanitized = newUrl.trim();
+    while (sanitized.endsWith('/') && sanitized.length > 8) {
+      sanitized = sanitized.substring(0, sanitized.length - 1);
+    }
+    _dio.options.baseUrl = sanitized;
   }
 
   Future<PagedResponse<MangaSummary>> getPagedManga({
@@ -216,7 +220,11 @@ class MangaApiService {
   String getImageUrl(String? path) {
     if (path == null || path.isEmpty) return '';
     if (path.startsWith('http')) return path;
-    return '${AppConfig.baseUrl}$path';
+
+    String baseUrl = AppConfig.baseUrl;
+    String cleanPath = path.startsWith('/') ? path : '/$path';
+
+    return '$baseUrl$cleanPath';
   }
 
   String getLocalImageUrl(String? localPath, String? remotePath) {
@@ -225,12 +233,19 @@ class MangaApiService {
     }
     if (localPath.startsWith('http')) return localPath;
 
+    String baseUrl = AppConfig.baseUrl;
+
     // If it already includes the full path including endpoint
     if (localPath.startsWith('/api/images/')) {
-      return '${AppConfig.baseUrl}$localPath';
+      return '$baseUrl$localPath';
     }
 
-    return '${AppConfig.baseUrl}/api/images/$localPath';
+    if (localPath.startsWith('api/images/')) {
+      return '$baseUrl/$localPath';
+    }
+
+    String cleanLocalPath = localPath.startsWith('/') ? localPath.substring(1) : localPath;
+    return '$baseUrl/api/images/$cleanLocalPath';
   }
 
   Future<void> scrapManga(

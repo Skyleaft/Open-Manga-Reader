@@ -6,12 +6,25 @@ class AppConfig {
     defaultValue: 'http://localhost:5126',
   );
 
-  static String baseUrl = _defaultBaseUrl;
+  static String _baseUrl = _defaultBaseUrl;
+
+  static String get baseUrl => _baseUrl;
+
+  static set baseUrl(String value) {
+    String sanitized = value.trim();
+    while (sanitized.endsWith('/') && sanitized.length > 8) { // Keep at least https://
+      sanitized = sanitized.substring(0, sanitized.length - 1);
+    }
+    _baseUrl = sanitized;
+  }
 
   static Future<void> init() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      baseUrl = prefs.getString('api_base_url') ?? _defaultBaseUrl;
+      final savedUrl = prefs.getString('api_base_url');
+      if (savedUrl != null) {
+        baseUrl = savedUrl;
+      }
     } catch (e) {
       // Fallback
     }
@@ -21,7 +34,7 @@ class AppConfig {
     baseUrl = newUrl;
     try {
       final prefs = await SharedPreferences.getInstance();
-      await prefs.setString('api_base_url', newUrl);
+      await prefs.setString('api_base_url', _baseUrl);
     } catch (e) {
       // Ignored
     }
