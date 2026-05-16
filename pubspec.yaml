@@ -29,6 +29,8 @@ dependencies:
   cached_network_image_ce: ^4.6.4
   animated_icon: ^1.0.0
   package_info_plus: ^8.1.1
+  share_plus: ^12.0.2
+  app_links: ^7.0.0
 
 dev_dependencies:
   flutter_test:

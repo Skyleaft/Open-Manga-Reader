@@ -15,7 +15,9 @@ import '../../../data/services/manga_detail_service.dart';
 import '../../../data/services/progression_service.dart';
 import '../../../routes/app_pages.dart';
 import 'package:intl/intl.dart';
+import 'package:share_plus/share_plus.dart';
 import '../../../core/widgets/discover_card.dart';
+import '../../../core/config/app_config.dart';
 import '../../../data/models/manga_summary.dart';
 
 class MangaDetailScreen extends StatefulWidget {
@@ -364,7 +366,16 @@ class _MangaDetailScreenState extends State<MangaDetailScreen>
                           color: Colors.white,
                           size: 20,
                         ),
-                        onPressed: () {},
+                        onPressed: () {
+                          final String shareUrl = '${AppConfig.baseUrl}/manga/${manga.id}';
+                          final String customSchemeUrl = 'skyleaft-manga://manga/${manga.id}';
+                          final String shareText =
+                              'Check out ${manga.title} on My Manga Reader!\n\n'
+                              'Read it here: $shareUrl\n'
+                              'Or open in app: $customSchemeUrl';
+
+                          Share.share(shareText, subject: 'Share ${manga.title}');
+                        },
                       ),
                     ),
                   ],

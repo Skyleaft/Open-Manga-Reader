@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:provider/provider.dart';
@@ -6,6 +7,10 @@ import 'package:my_manga_reader/data/models/api_config.dart';
 import 'core/theme/app_theme.dart';
 import 'routes/app_pages.dart';
 import 'presentation/screens/auth/login_screen.dart';
+import 'package:app_links/app_links.dart';
+import 'data/services/manga_api_service.dart';
+import 'data/models/manga_detail.dart';
+import 'core/di/injection.dart';
 
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
@@ -16,6 +21,7 @@ class MyApp extends StatelessWidget {
       create: (_) => AuthService(),
       child: MaterialApp(
         title: 'Open Manga Reader',
+        navigatorKey: AppRoutes.navigatorKey,
         debugShowCheckedModeBanner: false,
         theme: AppTheme.lightTheme,
         darkTheme: AppTheme.darkTheme,
@@ -37,17 +43,60 @@ class AuthWrapper extends StatefulWidget {
 class _AuthWrapperState extends State<AuthWrapper> {
   final AuthService _authService = AuthService();
   bool _isCheckingAuth = true;
-  Stream<User?>? _authStateStream;
+  late AppLinks _appLinks;
+  StreamSubscription<Uri>? _linkSubscription;
 
   @override
   void initState() {
     super.initState();
+    _initDeepLinks();
     _checkAuthState();
   }
 
   @override
   void dispose() {
+    _linkSubscription?.cancel();
     super.dispose();
+  }
+
+  Future<void> _initDeepLinks() async {
+    _appLinks = AppLinks();
+
+    // Handle links when app is already open
+    _linkSubscription = _appLinks.uriLinkStream.listen((uri) {
+      _handleDeepLink(uri);
+    });
+
+    // Handle link that opened the app
+    final initialUri = await _appLinks.getInitialLink();
+    if (initialUri != null) {
+      _handleDeepLink(initialUri);
+    }
+  }
+
+  Future<void> _handleDeepLink(Uri uri) async {
+    // Expected format: /manga/id or skyleaft-manga://manga/id
+    String? mangaId;
+    if (uri.pathSegments.length >= 2 && uri.pathSegments[0] == 'manga') {
+      mangaId = uri.pathSegments[1];
+    } else if (uri.host == 'manga' && uri.pathSegments.isNotEmpty) {
+      mangaId = uri.pathSegments[0];
+    }
+
+    if (mangaId != null) {
+      try {
+        final apiService = getIt<MangaApiService>();
+        final mangaData = await apiService.getMangaDetail(mangaId);
+        final manga = MangaDetail.fromMap(mangaData);
+
+        AppRoutes.navigatorKey.currentState?.pushNamed(
+          AppRoutes.detail,
+          arguments: manga,
+        );
+      } catch (e) {
+        debugPrint('Error handling deep link: $e');
+      }
+    }
   }
 
   Future<void> _checkAuthState() async {
