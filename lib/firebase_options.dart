@@ -40,55 +40,52 @@ class DefaultFirebaseOptions {
   }
 
   static FirebaseOptions get web => FirebaseOptions(
-        apiKey: dotenv.get('FIREBASE_WEB_API_KEY'),
-        appId: dotenv.get('FIREBASE_WEB_APP_ID'),
-        messagingSenderId: dotenv.get('FIREBASE_SENDER_ID'),
-        projectId: dotenv.get('FIREBASE_PROJECT_ID'),
-        authDomain: dotenv.get('FIREBASE_WEB_AUTH_DOMAIN'),
-        storageBucket: dotenv.get('FIREBASE_STORAGE_BUCKET'),
-        measurementId: dotenv.get('FIREBASE_WEB_MEASUREMENT_ID'),
-      );
+    apiKey: dotenv.get('FIREBASE_WEB_API_KEY'),
+    appId: dotenv.get('FIREBASE_WEB_APP_ID'),
+    messagingSenderId: dotenv.get('FIREBASE_SENDER_ID'),
+    projectId: dotenv.get('FIREBASE_PROJECT_ID'),
+    authDomain: dotenv.get('FIREBASE_WEB_AUTH_DOMAIN'),
+    storageBucket: dotenv.get('FIREBASE_STORAGE_BUCKET'),
+    measurementId: dotenv.get('FIREBASE_WEB_MEASUREMENT_ID'),
+  );
 
   static FirebaseOptions get android => FirebaseOptions(
-        apiKey: dotenv.get('FIREBASE_ANDROID_API_KEY'),
-        appId: dotenv.get('FIREBASE_ANDROID_APP_ID'),
-        messagingSenderId: dotenv.get('FIREBASE_SENDER_ID'),
-        projectId: dotenv.get('FIREBASE_PROJECT_ID'),
-        storageBucket: dotenv.get('FIREBASE_STORAGE_BUCKET'),
-      );
+    apiKey: dotenv.get('FIREBASE_ANDROID_API_KEY'),
+    appId: dotenv.get('FIREBASE_ANDROID_APP_ID'),
+    messagingSenderId: dotenv.get('FIREBASE_SENDER_ID'),
+    projectId: dotenv.get('FIREBASE_PROJECT_ID'),
+    storageBucket: dotenv.get('FIREBASE_STORAGE_BUCKET'),
+  );
 
   static FirebaseOptions get ios => FirebaseOptions(
-        apiKey: dotenv.get('FIREBASE_IOS_API_KEY'),
-        appId: dotenv.get('FIREBASE_IOS_APP_ID'),
-        messagingSenderId: dotenv.get('FIREBASE_SENDER_ID'),
-        projectId: dotenv.get('FIREBASE_PROJECT_ID'),
-        storageBucket: dotenv.get('FIREBASE_STORAGE_BUCKET'),
-        androidClientId: dotenv.get('FIREBASE_ANDROID_CLIENT_ID'),
-        iosClientId: dotenv.get('FIREBASE_IOS_CLIENT_ID'),
-        iosBundleId: dotenv.get('FIREBASE_IOS_BUNDLE_ID'),
-      );
+    apiKey: dotenv.get('FIREBASE_IOS_API_KEY'),
+    appId: dotenv.get('FIREBASE_IOS_APP_ID'),
+    messagingSenderId: dotenv.get('FIREBASE_SENDER_ID'),
+    projectId: dotenv.get('FIREBASE_PROJECT_ID'),
+    storageBucket: dotenv.get('FIREBASE_STORAGE_BUCKET'),
+    androidClientId: dotenv.get('FIREBASE_ANDROID_CLIENT_ID'),
+    iosClientId: dotenv.get('FIREBASE_IOS_CLIENT_ID'),
+    iosBundleId: dotenv.get('FIREBASE_IOS_BUNDLE_ID'),
+  );
 
   static FirebaseOptions get macos => FirebaseOptions(
-        apiKey: dotenv.get('FIREBASE_IOS_API_KEY'),
-        appId: dotenv.get('FIREBASE_IOS_APP_ID'),
-        messagingSenderId: dotenv.get('FIREBASE_SENDER_ID'),
-        projectId: dotenv.get('FIREBASE_PROJECT_ID'),
-        storageBucket: dotenv.get('FIREBASE_STORAGE_BUCKET'),
-        androidClientId: dotenv.get('FIREBASE_ANDROID_CLIENT_ID'),
-        iosClientId: dotenv.get('FIREBASE_IOS_CLIENT_ID'),
-        iosBundleId: dotenv.get('FIREBASE_IOS_BUNDLE_ID'),
-      );
+    apiKey: dotenv.get('FIREBASE_IOS_API_KEY'),
+    appId: dotenv.get('FIREBASE_IOS_APP_ID'),
+    messagingSenderId: dotenv.get('FIREBASE_SENDER_ID'),
+    projectId: dotenv.get('FIREBASE_PROJECT_ID'),
+    storageBucket: dotenv.get('FIREBASE_STORAGE_BUCKET'),
+    androidClientId: dotenv.get('FIREBASE_ANDROID_CLIENT_ID'),
+    iosClientId: dotenv.get('FIREBASE_IOS_CLIENT_ID'),
+    iosBundleId: dotenv.get('FIREBASE_IOS_BUNDLE_ID'),
+  );
 
   static FirebaseOptions get windows => FirebaseOptions(
-        apiKey: dotenv.get('FIREBASE_WEB_API_KEY'),
-        appId: dotenv.get('FIREBASE_WINDOWS_APP_ID'),
-        messagingSenderId: dotenv.get('FIREBASE_SENDER_ID'),
-        projectId: dotenv.get('FIREBASE_PROJECT_ID'),
-        authDomain: dotenv.get('FIREBASE_WEB_AUTH_DOMAIN'),
-        storageBucket: dotenv.get('FIREBASE_STORAGE_BUCKET'),
-        measurementId: dotenv.get('FIREBASE_WINDOWS_MEASUREMENT_ID'),
-      );
-}
-
-
+    apiKey: dotenv.get('FIREBASE_WEB_API_KEY'),
+    appId: dotenv.get('FIREBASE_WINDOWS_APP_ID'),
+    messagingSenderId: dotenv.get('FIREBASE_SENDER_ID'),
+    projectId: dotenv.get('FIREBASE_PROJECT_ID'),
+    authDomain: dotenv.get('FIREBASE_WEB_AUTH_DOMAIN'),
+    storageBucket: dotenv.get('FIREBASE_STORAGE_BUCKET'),
+    measurementId: dotenv.get('FIREBASE_WINDOWS_MEASUREMENT_ID'),
+  );
 }
