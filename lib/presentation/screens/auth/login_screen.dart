@@ -3,6 +3,7 @@ import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:my_manga_reader/data/services/auth_service.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../routes/app_pages.dart';
+import '../../../data/models/api_config.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -14,6 +15,24 @@ class LoginScreen extends StatefulWidget {
 class _LoginScreenState extends State<LoginScreen> {
   final AuthService _authService = AuthService();
   bool _isLoading = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _checkApiConfig();
+  }
+
+  Future<void> _checkApiConfig() async {
+    // Wait a frame to ensure context is available
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      final activeConfig = await ApiConfigManager.getActiveApiConfig();
+      if (activeConfig == null) {
+        if (mounted) {
+          Navigator.pushNamed(context, AppRoutes.baseApiSetting);
+        }
+      }
+    });
+  }
 
   Future<void> _handleGoogleSignIn() async {
     if (_isLoading) return;

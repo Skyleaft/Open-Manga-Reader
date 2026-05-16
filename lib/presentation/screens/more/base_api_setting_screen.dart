@@ -35,6 +35,15 @@ class _BaseApiSettingScreenState extends State<BaseApiSettingScreen> {
         _activeConfig = _apiConfigs.first;
         await ApiConfigManager.setActiveApiId(_activeConfig!.id);
       }
+
+      // If absolutely no configs exist, show the add dialog automatically
+      if (_apiConfigs.isEmpty) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) {
+            _showConfigureDialog();
+          }
+        });
+      }
     } catch (e) {
       // Handle error
     } finally {
