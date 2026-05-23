@@ -329,6 +329,17 @@ class _ReaderScreenState extends State<ReaderScreen>
 
   @override
   Widget build(BuildContext context) {
+    final double maxChapter = widget.content.allChapters.fold(
+      0.0,
+      (max, c) => c.chapterNumber > max ? c.chapterNumber : max,
+    );
+    final String maxChapterStr = maxChapter % 1 == 0
+        ? maxChapter.toInt().toString()
+        : maxChapter.toString();
+    final String currentChapterStr = _currentChapterNumber % 1 == 0
+        ? _currentChapterNumber.toInt().toString()
+        : _currentChapterNumber.toString();
+
     return Focus(
       // Gunakan Focus agar bisa menangkap event keyboard
       autofocus: true,
@@ -363,7 +374,7 @@ class _ReaderScreenState extends State<ReaderScreen>
               right: 0,
               child: ReaderHeader(
                 mangaTitle: widget.content.mangaTitle,
-                chapterTitle: _chapterTitle,
+                chapterTitle: 'Chapter $currentChapterStr / $maxChapterStr',
                 onBack: () => Navigator.pop(context),
                 onSettings: () {},
               ),

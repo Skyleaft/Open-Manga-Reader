@@ -45,6 +45,7 @@ class _AuthWrapperState extends State<AuthWrapper> {
   bool _isCheckingAuth = true;
   late AppLinks _appLinks;
   StreamSubscription<Uri>? _linkSubscription;
+  StreamSubscription<User?>? _authSubscription;
 
   @override
   void initState() {
@@ -56,6 +57,7 @@ class _AuthWrapperState extends State<AuthWrapper> {
   @override
   void dispose() {
     _linkSubscription?.cancel();
+    _authSubscription?.cancel();
     super.dispose();
   }
 
@@ -102,30 +104,29 @@ class _AuthWrapperState extends State<AuthWrapper> {
   Future<void> _checkAuthState() async {
     try {
       // Listen to auth state changes
-      _authStateStream = _authService.authStateChanges;
-
-      _authStateStream
-          ?.listen((User? user) async {
-            if (mounted) {
-              if (user != null) {
-                // User is signed in, check API configuration
-                await _checkApiConfiguration();
-              } else {
-                // No user signed in, show login screen
-                setState(() {
-                  _isCheckingAuth = false;
-                });
-              }
-            }
-          })
-          .onError((error) {
-            // In case of error, show login screen
-            if (mounted) {
+      _authSubscription = _authService.authStateChanges.listen(
+        (User? user) async {
+          if (mounted) {
+            if (user != null) {
+              // User is signed in, check API configuration
+              await _checkApiConfiguration();
+            } else {
+              // No user signed in, show login screen
               setState(() {
                 _isCheckingAuth = false;
               });
             }
-          });
+          }
+        },
+        onError: (error) {
+          // In case of error, show login screen
+          if (mounted) {
+            setState(() {
+              _isCheckingAuth = false;
+            });
+          }
+        },
+      );
 
       // Add a timeout to prevent getting stuck
       Future.delayed(const Duration(seconds: 3), () {

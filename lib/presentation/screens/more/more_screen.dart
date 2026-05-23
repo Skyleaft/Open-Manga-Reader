@@ -1,12 +1,43 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../data/services/auth_service.dart';
 import 'base_api_setting_screen.dart';
 
-class MoreScreen extends StatelessWidget {
+class MoreScreen extends StatefulWidget {
   const MoreScreen({super.key});
+
+  @override
+  State<MoreScreen> createState() => _MoreScreenState();
+}
+
+class _MoreScreenState extends State<MoreScreen> {
+  String _appVersion = 'Loading...';
+
+  @override
+  void initState() {
+    super.initState();
+    _loadAppVersion();
+  }
+
+  Future<void> _loadAppVersion() async {
+    try {
+      final packageInfo = await PackageInfo.fromPlatform();
+      if (mounted) {
+        setState(() {
+          _appVersion = 'v${packageInfo.version}+${packageInfo.buildNumber}';
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _appVersion = 'Unknown';
+        });
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -128,7 +159,7 @@ class MoreScreen extends StatelessWidget {
                 context,
                 icon: Icons.info_outline,
                 title: 'App Version',
-                subtitle: 'v1.0.0',
+                subtitle: _appVersion,
                 onTap: () {},
               ),
               _buildMenuItem(
@@ -305,9 +336,9 @@ class MoreScreen extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 24),
-        const Text(
-          'App Version v1.0.0',
-          style: TextStyle(color: Colors.grey, fontSize: 12),
+        Text(
+          'App Version $_appVersion',
+          style: const TextStyle(color: Colors.grey, fontSize: 12),
         ),
       ],
     );
