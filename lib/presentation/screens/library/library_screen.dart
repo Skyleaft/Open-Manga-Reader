@@ -24,6 +24,7 @@ class _LibraryScreenState extends State<LibraryScreen> {
   List<LibraryManga> _libraryMangas = [];
   bool _isLoading = true;
   String _selectedStatus = 'All';
+  String _searchQuery = '';
 
   @override
   void initState() {
@@ -133,8 +134,13 @@ class _LibraryScreenState extends State<LibraryScreen> {
                   : AppColors.primary.withOpacity(0.1),
               borderRadius: BorderRadius.circular(12),
             ),
-            child: const TextField(
-              decoration: InputDecoration(
+            child: TextField(
+              onChanged: (value) {
+                setState(() {
+                  _searchQuery = value;
+                });
+              },
+              decoration: const InputDecoration(
                 hintText: 'Search in library',
                 prefixIcon: Icon(Icons.search, size: 20, color: Colors.grey),
                 border: InputBorder.none,
@@ -204,13 +210,13 @@ class _LibraryScreenState extends State<LibraryScreen> {
       );
     }
 
-    final filteredMangas = _selectedStatus == 'All'
-        ? _libraryMangas
-        : _libraryMangas
-              .where(
-                (m) => m.status.toLowerCase() == _selectedStatus.toLowerCase(),
-              )
-              .toList();
+    final filteredMangas = _libraryMangas.where((m) {
+      final matchesStatus = _selectedStatus == 'All' ||
+          m.status.toLowerCase() == _selectedStatus.toLowerCase();
+      final matchesSearch = _searchQuery.isEmpty ||
+          m.title.toLowerCase().contains(_searchQuery.toLowerCase());
+      return matchesStatus && matchesSearch;
+    }).toList();
 
     if (filteredMangas.isEmpty) {
       return SliverToBoxAdapter(
