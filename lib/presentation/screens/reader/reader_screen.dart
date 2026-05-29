@@ -434,66 +434,82 @@ class _ReaderScreenState extends State<ReaderScreen>
             AnimatedPositioned(
               duration: const Duration(milliseconds: 300),
               bottom: _showUI ? 20 : -350,
-              left: 20,
-              right: 20,
-              child: ReaderBottomBar(
-                progress: _progress,
-                currentPage: _currentPage,
-                totalPages: _pageUrls.length,
-                isSliderScrolling: _isSliderScrolling,
-                isAutoScrolling: _isAutoScrolling,
-                autoScrollSpeed: _autoScrollSpeed,
-                onToggleAutoScroll: _toggleAutoScroll,
-                onSpeedChange: _changeAutoScrollSpeed,
-                onProgressChanged: (value) {
-                  setState(() {
-                    _progress = value;
-                    if (_pageUrls.isEmpty) return;
+              left: 0,
+              right: 0,
+              child: Center(
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 800),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 20),
+                    child: ReaderBottomBar(
+                      progress: _progress,
+                      currentPage: _currentPage,
+                      totalPages: _pageUrls.length,
+                      isSliderScrolling: _isSliderScrolling,
+                      isAutoScrolling: _isAutoScrolling,
+                      autoScrollSpeed: _autoScrollSpeed,
+                      onToggleAutoScroll: _toggleAutoScroll,
+                      onSpeedChange: _changeAutoScrollSpeed,
+                      onProgressChanged: (value) {
+                        setState(() {
+                          _progress = value;
+                          if (_pageUrls.isEmpty) return;
 
-                    _currentPage =
-                        ((value * (_pageUrls.length - 1)).round() + 1).clamp(
-                          1,
-                          _pageUrls.length,
-                        );
-                  });
+                          _currentPage =
+                              ((value * (_pageUrls.length - 1)).round() + 1)
+                                  .clamp(1, _pageUrls.length);
+                        });
 
-                  if (_scrollController.hasClients) {
-                    final maxScroll =
-                        _scrollController.position.maxScrollExtent;
-                    final target = value * maxScroll;
+                        if (_scrollController.hasClients) {
+                          final maxScroll =
+                              _scrollController.position.maxScrollExtent;
+                          final target = value * maxScroll;
 
-                    if (maxScroll > 0) {
-                      _scrollController.jumpTo(target.clamp(0, maxScroll));
-                    }
-                  }
-                },
-                onProgressChangeStart: (_) {
-                  _isSliderScrolling = true;
-                },
-                onProgressChangeEnd: (_) {
-                  _isSliderScrolling = false;
-                },
-                onNextChapter: () => _changeChapter(true),
-                onPreviousChapter: () => _changeChapter(false),
+                          if (maxScroll > 0) {
+                            _scrollController.jumpTo(
+                              target.clamp(0, maxScroll),
+                            );
+                          }
+                        }
+                      },
+                      onProgressChangeStart: (_) {
+                        _isSliderScrolling = true;
+                      },
+                      onProgressChangeEnd: (_) {
+                        _isSliderScrolling = false;
+                      },
+                      onNextChapter: () => _changeChapter(true),
+                      onPreviousChapter: () => _changeChapter(false),
+                    ),
+                  ),
+                ),
               ),
             ),
 
             // Mini Progress Bar
             Positioned(
-              left: 16,
-              right: 16,
+              left: 0,
+              right: 0,
               bottom: 16,
-              child: AnimatedOpacity(
-                duration: const Duration(milliseconds: 300),
-                opacity: _showUI ? 0 : 1,
-                child: LinearProgressIndicator(
-                  value: _progress,
-                  borderRadius: BorderRadius.circular(16),
-                  backgroundColor: Colors.white10,
-                  valueColor: const AlwaysStoppedAnimation<Color>(
-                    AppColors.primary,
+              child: Center(
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 800),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    child: AnimatedOpacity(
+                      duration: const Duration(milliseconds: 300),
+                      opacity: _showUI ? 0 : 1,
+                      child: LinearProgressIndicator(
+                        value: _progress,
+                        borderRadius: BorderRadius.circular(16),
+                        backgroundColor: Colors.white10,
+                        valueColor: const AlwaysStoppedAnimation<Color>(
+                          AppColors.primary,
+                        ),
+                        minHeight: 6,
+                      ),
+                    ),
                   ),
-                  minHeight: 6,
                 ),
               ),
             ),
