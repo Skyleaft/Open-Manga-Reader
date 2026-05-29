@@ -1,5 +1,6 @@
-import 'dart:ui';
+// Removed dart:ui
 import 'package:flutter/material.dart';
+import 'package:flutter/scheduler.dart';
 import 'dart:async';
 import 'package:flutter/services.dart';
 import '../../../core/constants/app_colors.dart';
@@ -8,7 +9,6 @@ import '../../../data/models/progression.dart';
 import '../../../data/models/reader_content.dart';
 import '../../../data/services/manga_api_service.dart';
 import '../../../data/services/progression_service.dart';
-import 'widgets/app_network_image.dart';
 import 'widgets/reader_header.dart';
 import 'widgets/reader_bottom_bar.dart';
 import 'widgets/reader_content.dart';
@@ -23,13 +23,18 @@ class ReaderScreen extends StatefulWidget {
 }
 
 class _ReaderScreenState extends State<ReaderScreen>
-    with SingleTickerProviderStateMixin {
+    with TickerProviderStateMixin {
   final MangaApiService _apiService = getIt<MangaApiService>();
   final ProgressionService _progressionService = getIt<ProgressionService>();
   bool _showUI = true;
   bool _isLoading = false;
   Timer? _debounceTimer;
   bool _isSliderScrolling = false;
+
+  bool _isAutoScrolling = false;
+  double _autoScrollSpeed = 1.0;
+  late Ticker _autoScrollTicker;
+  Duration _lastTick = Duration.zero;
 
   final TransformationController _transformationController =
       TransformationController();
@@ -38,7 +43,7 @@ class _ReaderScreenState extends State<ReaderScreen>
 
   // Local state to allow chapter switching
   late List<String> _pageUrls;
-  late String _chapterTitle;
+  // _chapterTitle removed because it's unused
   late String _chapterId;
   late double _currentChapterNumber;
 
@@ -55,11 +60,12 @@ class _ReaderScreenState extends State<ReaderScreen>
     super.initState();
     _pageUrls = widget.content.pageUrls;
 
-    _chapterTitle = widget.content.chapterTitle;
+    // _chapterTitle = widget.content.chapterTitle;
     _chapterId = widget.content.chapterId;
     _currentChapterNumber = widget.content.currentChapterNumber;
 
     _animationController = AnimationController(vsync: this);
+    _autoScrollTicker = createTicker(_onAutoScrollTick);
 
     // Set initial scroll position based on saved progress
     if (widget.content.currentPage > 1 &&
@@ -105,6 +111,7 @@ class _ReaderScreenState extends State<ReaderScreen>
 
   @override
   void dispose() {
+    _autoScrollTicker.dispose();
     _scrollController.removeListener(_onScroll);
     _scrollController.dispose();
     _transformationController.removeListener(_onTransformationChanged);
@@ -213,7 +220,7 @@ class _ReaderScreenState extends State<ReaderScreen>
             )
             .toList();
 
-        _chapterTitle = targetChapter.title;
+        // _chapterTitle = targetChapter.title;
         _chapterId = targetChapter.id;
         _currentChapterNumber = targetChapter.chapterNumber;
         _progress = 0.0;
@@ -241,6 +248,47 @@ class _ReaderScreenState extends State<ReaderScreen>
     });
   }
 
+  void _onAutoScrollTick(Duration elapsed) {
+    if (!_scrollController.hasClients || !_isAutoScrolling) return;
+
+    final delta = elapsed - _lastTick;
+    _lastTick = elapsed;
+
+    final offset = _scrollController.offset;
+    final maxScroll = _scrollController.position.maxScrollExtent;
+
+    if (offset >= maxScroll) {
+      _toggleAutoScroll();
+      return;
+    }
+
+    final pixelsToMove = (delta.inMilliseconds / 1000) * 50 * _autoScrollSpeed;
+    _scrollController.jumpTo(offset + pixelsToMove);
+  }
+
+  void _toggleAutoScroll() {
+    setState(() {
+      _isAutoScrolling = !_isAutoScrolling;
+      if (_isAutoScrolling) {
+        _lastTick = Duration.zero;
+        _autoScrollTicker.start();
+        _showUI = false;
+      } else {
+        _autoScrollTicker.stop();
+      }
+    });
+  }
+
+  void _changeAutoScrollSpeed() {
+    setState(() {
+      if (_autoScrollSpeed >= 3.0) {
+        _autoScrollSpeed = 0.5;
+      } else {
+        _autoScrollSpeed += 0.5;
+      }
+    });
+  }
+
   void _handleDoubleTapDown(TapDownDetails details) {
     _doubleTapDetails = details;
   }
@@ -262,7 +310,9 @@ class _ReaderScreenState extends State<ReaderScreen>
       final y = -position.dy * (targetScale - 1);
 
       final targetMatrix = Matrix4.identity()
+        // ignore: deprecated_member_use
         ..translate(x, y, 0.0)
+        // ignore: deprecated_member_use
         ..scale(targetScale, targetScale, 1.0);
 
       _animateTo(targetMatrix, duration: const Duration(milliseconds: 250));
@@ -391,6 +441,10 @@ class _ReaderScreenState extends State<ReaderScreen>
                 currentPage: _currentPage,
                 totalPages: _pageUrls.length,
                 isSliderScrolling: _isSliderScrolling,
+                isAutoScrolling: _isAutoScrolling,
+                autoScrollSpeed: _autoScrollSpeed,
+                onToggleAutoScroll: _toggleAutoScroll,
+                onSpeedChange: _changeAutoScrollSpeed,
                 onProgressChanged: (value) {
                   setState(() {
                     _progress = value;

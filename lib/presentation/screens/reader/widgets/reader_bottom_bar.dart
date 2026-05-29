@@ -12,6 +12,10 @@ class ReaderBottomBar extends StatelessWidget {
   final ValueChanged<double> onProgressChangeEnd;
   final VoidCallback onNextChapter;
   final VoidCallback onPreviousChapter;
+  final bool isAutoScrolling;
+  final double autoScrollSpeed;
+  final VoidCallback onToggleAutoScroll;
+  final VoidCallback onSpeedChange;
 
   const ReaderBottomBar({
     super.key,
@@ -24,6 +28,10 @@ class ReaderBottomBar extends StatelessWidget {
     required this.onProgressChangeEnd,
     required this.onNextChapter,
     required this.onPreviousChapter,
+    required this.isAutoScrolling,
+    required this.autoScrollSpeed,
+    required this.onToggleAutoScroll,
+    required this.onSpeedChange,
   });
 
   @override
@@ -37,7 +45,7 @@ class ReaderBottomBar extends StatelessWidget {
           decoration: BoxDecoration(
             color: const Color.fromARGB(255, 45, 45, 45).withValues(alpha: 0.7),
             borderRadius: BorderRadius.circular(32),
-            border: Border.all(color: Colors.white.withOpacity(0.1)),
+            border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
           ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -90,9 +98,54 @@ class ReaderBottomBar extends StatelessWidget {
               // Info Row
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 12),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
+                child: Stack(
+                  alignment: Alignment.center,
                   children: [
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          IconButton(
+                            icon: Icon(
+                              isAutoScrolling
+                                  ? Icons.pause_circle_outline
+                                  : Icons.play_circle_outline,
+                              color: Colors.white70,
+                              size: 20,
+                            ),
+                            onPressed: onToggleAutoScroll,
+                            visualDensity: VisualDensity.compact,
+                            padding: EdgeInsets.zero,
+                            constraints: const BoxConstraints(),
+                          ),
+                          if (isAutoScrolling) ...[
+                            const SizedBox(width: 8),
+                            GestureDetector(
+                              onTap: onSpeedChange,
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 6,
+                                  vertical: 2,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: Colors.white10,
+                                  borderRadius: BorderRadius.circular(4),
+                                ),
+                                child: Text(
+                                  '${autoScrollSpeed.toStringAsFixed(1)}x',
+                                  style: const TextStyle(
+                                    color: Colors.white70,
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
                     Text(
                       'PAGE $currentPage OF $totalPages  •  ${((progress * 100).toInt())}%',
                       style: const TextStyle(
