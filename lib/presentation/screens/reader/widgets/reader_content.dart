@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../data/models/reader_content.dart';
 import 'app_network_image.dart';
+import 'dart:math' as math;
 
 class ReaderContentWidget extends StatelessWidget {
   final List<String> pageUrls;
@@ -64,31 +65,35 @@ class ReaderContentWidget extends StatelessWidget {
                       delegate: SliverChildBuilderDelegate((context, index) {
                         final url = pageUrls[index];
 
-                        final imageHeight = screenWidth * 1.5;
+                        final contentWidth = math.min(screenWidth, 800.0);
+                        final imageHeight = contentWidth * 1.5;
 
-                        return SizedBox(
-                          width: screenWidth,
-                          child: AppNetworkImage(
-                            imageUrl: url,
-                            fit: BoxFit.fitWidth,
-                            width: screenWidth,
-                            gaplessPlayback: true,
-                            placeholder: Container(
-                              height: imageHeight,
-                              width: screenWidth,
-                              color: Colors.black,
-                              child: const Center(
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
+                        return Align(
+                          alignment: Alignment.center,
+                          child: SizedBox(
+                            width: contentWidth,
+                            child: AppNetworkImage(
+                              imageUrl: url,
+                              fit: BoxFit.fitWidth,
+                              width: contentWidth,
+                              gaplessPlayback: true,
+                              placeholder: Container(
+                                height: imageHeight,
+                                width: contentWidth,
+                                color: Colors.black,
+                                child: const Center(
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                  ),
                                 ),
                               ),
-                            ),
-                            errorWidget: Container(
-                              height: imageHeight,
-                              color: Colors.black,
-                              child: const Icon(
-                                Icons.broken_image,
-                                color: Colors.white24,
+                              errorWidget: Container(
+                                height: imageHeight,
+                                color: Colors.black,
+                                child: const Icon(
+                                  Icons.broken_image,
+                                  color: Colors.white24,
+                                ),
                               ),
                             ),
                           ),
