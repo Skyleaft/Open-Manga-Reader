@@ -103,72 +103,72 @@ class AppBottomNav extends StatelessWidget {
     bool showLabel,
   ) {
     final isActive = currentIndex == index;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
-    return Expanded(
-      child: InkWell(
-        onTap: () => onTap(index),
-        borderRadius: BorderRadius.circular(24),
-        splashColor: AppColors.primary.withValues(alpha: 0.1),
-        highlightColor: AppColors.primary.withValues(alpha: 0.05),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
-          child: AnimatedContainer(
-            duration: const Duration(milliseconds: 200),
-            curve: Curves.easeInOut,
-            decoration: BoxDecoration(
+    return InkWell(
+      onTap: () => onTap(index),
+      borderRadius: BorderRadius.circular(24),
+      splashColor: AppColors.primary.withValues(alpha: 0.1),
+      highlightColor: AppColors.primary.withValues(alpha: 0.05),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeInOut,
+        padding: EdgeInsets.symmetric(
+          horizontal: isActive ? 16 : 12,
+          vertical: 8,
+        ),
+        decoration: BoxDecoration(
+          color: isActive
+              ? AppColors.primary.withValues(alpha: 0.15)
+              : Colors.transparent,
+          borderRadius: BorderRadius.circular(24),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            AnimateIcon(
+              key: ValueKey('nav_item_$index'),
+              onTap: () => onTap(index),
+              iconType: IconType.animatedOnTap,
+              height: 24,
+              width: 24,
               color: isActive
-                  ? AppColors.primary.withValues(alpha: 0.2)
-                  : Colors.transparent,
-              borderRadius: BorderRadius.circular(24),
+                  ? AppColors.primary
+                  : isDark
+                  ? Colors.white70
+                  : AppColors.secondary,
+              animateIcon: animateIcon,
             ),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                AnimatedContainer(
-                  duration: const Duration(milliseconds: 200),
-                  curve: Curves.easeInOut,
-                  width: isActive ? 40 : 36,
-                  height: isActive ? 40 : 36,
-                  decoration: BoxDecoration(
-                    color: isActive
-                        ? AppColors.primary.withValues(alpha: 0.1)
-                        : Colors.transparent,
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: Center(
-                    child: AnimateIcon(
-                      key: ValueKey('nav_item_$index'),
-                      onTap: () => onTap(index),
-                      iconType: IconType.animatedOnTap,
-                      height: isActive ? 26 : 24,
-                      width: isActive ? 26 : 24,
-                      color: isActive
-                          ? AppColors.primary
-                          : Theme.of(context).brightness == Brightness.dark
-                          ? Colors.white70
-                          : AppColors.secondary,
-                      animateIcon: animateIcon,
-                    ),
+            ClipRect(
+              child: AnimatedSize(
+                duration: const Duration(milliseconds: 300),
+                curve: Curves.easeInOut,
+                child: SizedBox(
+                  width: (isActive || showLabel) ? null : 0,
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const SizedBox(width: 8),
+                      Text(
+                        label,
+                        style: TextStyle(
+                          color: isActive
+                              ? AppColors.primary
+                              : isDark
+                              ? Colors.white70
+                              : AppColors.secondary,
+                          fontWeight: isActive
+                              ? FontWeight.bold
+                              : FontWeight.normal,
+                          fontSize: 13,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
-                if (showLabel) ...[
-                  const SizedBox(height: 2),
-                  AnimatedDefaultTextStyle(
-                    duration: const Duration(milliseconds: 200),
-                    curve: Curves.easeInOut,
-                    style: TextStyle(
-                      color: isActive ? AppColors.primary : Colors.grey,
-                      fontSize: 10,
-                      fontWeight: isActive
-                          ? FontWeight.bold
-                          : FontWeight.normal,
-                    ),
-                    child: Text(label),
-                  ),
-                ],
-              ],
+              ),
             ),
-          ),
+          ],
         ),
       ),
     );
