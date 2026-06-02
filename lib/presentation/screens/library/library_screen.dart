@@ -295,7 +295,14 @@ class _LibraryScreenState extends State<LibraryScreen> {
         if (!context.mounted) return;
 
         if (cached != null) {
-          Navigator.pushNamed(context, AppRoutes.detail, arguments: cached);
+          await Navigator.pushNamed(
+            context,
+            AppRoutes.detail,
+            arguments: cached,
+          );
+          if (context.mounted) {
+            _loadLibrary();
+          }
           _apiService
               .getMangaDetail(mangaId)
               .then((data) {
@@ -322,11 +329,14 @@ class _LibraryScreenState extends State<LibraryScreen> {
           await _detailService.saveDetail(mangaDetail);
 
           if (!context.mounted) return;
-          Navigator.pushNamed(
+          await Navigator.pushNamed(
             context,
             AppRoutes.detail,
             arguments: mangaDetail,
           );
+          if (context.mounted) {
+            _loadLibrary();
+          }
         } catch (e) {
           if (!context.mounted) return;
           Navigator.pop(context);
