@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:my_manga_reader/data/services/auth_service.dart';
 import '../../../core/constants/app_colors.dart';
+import '../../../core/widgets/alert_banner.dart';
 import '../../../routes/app_pages.dart';
 import '../../../data/models/api_config.dart';
 
@@ -51,18 +52,19 @@ class _LoginScreenState extends State<LoginScreen> {
       } else {
         // Show error message
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Failed to sign in with Google'),
-              backgroundColor: Colors.red,
-            ),
+          AlertBanner.show(
+            context,
+            'Failed to sign in with Google',
+            type: AlertBannerType.error,
           );
         }
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
+        AlertBanner.show(
+          context,
+          'Error: $e',
+          type: AlertBannerType.error,
         );
       }
     } finally {

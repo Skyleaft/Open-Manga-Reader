@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:uuid/uuid.dart';
 import '../../../../core/constants/app_colors.dart';
+import '../../../../core/widgets/alert_banner.dart';
 import '../../../../data/models/api_config.dart';
 import '../../../../core/config/app_config.dart';
 import '../../../../core/di/injection.dart';
@@ -82,8 +83,10 @@ class _BaseApiSettingScreenState extends State<BaseApiSettingScreen> {
     apiService.updateBaseUrl(config.baseUrl);
 
     if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Active API set to ${config.name}')),
+      AlertBanner.show(
+        context,
+        'Active API set to ${config.name}',
+        type: AlertBannerType.success,
       );
     }
   }
@@ -100,8 +103,10 @@ class _BaseApiSettingScreenState extends State<BaseApiSettingScreen> {
       apiService.updateBaseUrl(_activeConfig!.baseUrl);
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('API Configuration Saved')),
+        AlertBanner.show(
+          context,
+          'API Configuration Saved',
+          type: AlertBannerType.success,
         );
         // Close the screen after saving
         Navigator.pop(context);

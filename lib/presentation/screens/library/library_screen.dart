@@ -2,6 +2,7 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:cached_network_image_ce/cached_network_image.dart';
 import '../../../core/constants/app_colors.dart';
+import '../../../core/widgets/alert_banner.dart';
 import '../../../core/di/injection.dart';
 import '../../../core/widgets/manga_card.dart';
 import '../../../data/models/library_manga.dart';
@@ -329,9 +330,11 @@ class _LibraryScreenState extends State<LibraryScreen> {
         } catch (e) {
           if (!context.mounted) return;
           Navigator.pop(context);
-          ScaffoldMessenger.of(
+          AlertBanner.show(
             context,
-          ).showSnackBar(SnackBar(content: Text('Failed to load details: $e')));
+            'Failed to load details: $e',
+            type: AlertBannerType.error,
+          );
         }
       },
       child: Container(

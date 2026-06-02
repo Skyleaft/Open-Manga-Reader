@@ -1,6 +1,7 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import '../../../core/constants/app_colors.dart';
+import '../../../core/widgets/alert_banner.dart';
 import '../../../core/di/injection.dart';
 import '../../../core/utils/formatters.dart';
 import '../../../core/widgets/discover_card.dart';
@@ -103,9 +104,11 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
         _isLoading = false;
         _isMoreLoading = false;
       });
-      ScaffoldMessenger.of(
+      AlertBanner.show(
         context,
-      ).showSnackBar(SnackBar(content: Text('Error: ${e.toString()}')));
+        'Error: ${e.toString()}',
+        type: AlertBannerType.error,
+      );
     }
   }
 
@@ -309,10 +312,10 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
                           } catch (e) {
                             if (!mounted) return;
                             Navigator.pop(context);
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: Text('Failed to load details: $e'),
-                              ),
+                            AlertBanner.show(
+                              context,
+                              'Failed to load details: $e',
+                              type: AlertBannerType.error,
                             );
                           }
                         },

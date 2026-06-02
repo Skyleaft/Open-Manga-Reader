@@ -4,6 +4,7 @@ import 'package:flutter/scheduler.dart';
 import 'dart:async';
 import 'package:flutter/services.dart';
 import '../../../core/constants/app_colors.dart';
+import '../../../core/widgets/alert_banner.dart';
 import '../../../core/di/injection.dart';
 import '../../../data/models/progression.dart';
 import '../../../data/models/reader_content.dart';
@@ -197,12 +198,10 @@ class _ReaderScreenState extends State<ReaderScreen>
     }
 
     if (targetIndex < 0 || targetIndex >= chapters.length) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            next ? 'This is the latest chapter' : 'This is the first chapter',
-          ),
-        ),
+      AlertBanner.show(
+        context,
+        next ? 'This is the latest chapter' : 'This is the first chapter',
+        type: AlertBannerType.info,
       );
       if (_pageController.hasClients && _currentPage > _pageUrls.length) {
         _pageController.animateToPage(
@@ -262,9 +261,11 @@ class _ReaderScreenState extends State<ReaderScreen>
     } catch (e) {
       setState(() => _isLoading = false);
       if (mounted) {
-        ScaffoldMessenger.of(
+        AlertBanner.show(
           context,
-        ).showSnackBar(SnackBar(content: Text('Failed to load chapter: $e')));
+          'Failed to load chapter: $e',
+          type: AlertBannerType.error,
+        );
       }
     }
   }
@@ -884,11 +885,10 @@ class _ReaderScreenState extends State<ReaderScreen>
     } catch (e) {
       // Show error message to help debug the issue
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Failed to save progress: $e'),
-            backgroundColor: Colors.red,
-          ),
+        AlertBanner.show(
+          context,
+          'Failed to save progress: $e',
+          type: AlertBannerType.error,
         );
       }
       // Log the error for debugging

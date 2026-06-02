@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:my_manga_reader/core/constants/app_colors.dart';
+import 'package:my_manga_reader/core/widgets/alert_banner.dart';
 import 'package:my_manga_reader/core/di/injection.dart';
 import 'package:my_manga_reader/data/services/manga_api_service.dart';
 import 'package:my_manga_reader/routes/app_pages.dart';
@@ -251,23 +252,23 @@ class _SearchScrapScreenState extends State<SearchScrapScreen> {
 
       Navigator.pop(context); // pop loading dialog
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            scrapChapters
-                ? 'Added to queue: Scraping all chapters...'
-                : 'Added to queue: Scraping metadata...',
-          ),
-        ),
+      AlertBanner.show(
+        context,
+        scrapChapters
+            ? 'Added to queue: Scraping all chapters...'
+            : 'Added to queue: Scraping metadata...',
+        type: AlertBannerType.success,
       );
     } catch (e) {
       if (!mounted) return;
 
       Navigator.pop(context); // pop loading dialog
 
-      ScaffoldMessenger.of(
+      AlertBanner.show(
         context,
-      ).showSnackBar(SnackBar(content: Text('Failed to scrap: $e')));
+        'Failed to scrap: $e',
+        type: AlertBannerType.error,
+      );
     }
   }
 

@@ -3,6 +3,7 @@ import 'package:cached_network_image_ce/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher_string.dart';
 import '../../../core/constants/app_colors.dart';
+import '../../../core/widgets/alert_banner.dart';
 import '../../../core/di/injection.dart';
 import '../../../core/utils/formatters.dart';
 import '../../../data/models/library_manga.dart';
@@ -224,9 +225,11 @@ class _MangaDetailScreenState extends State<MangaDetailScreen>
     try {
       if (_isInLibrary) {
         await _libraryService.removeFromLibrary(manga.id);
-        ScaffoldMessenger.of(
+        AlertBanner.show(
           context,
-        ).showSnackBar(const SnackBar(content: Text('Removed from library')));
+          'Removed from library',
+          type: AlertBannerType.success,
+        );
       } else {
         final status = await _showStatusSelection(context);
         if (status == null) return; // User cancelled
@@ -241,9 +244,11 @@ class _MangaDetailScreenState extends State<MangaDetailScreen>
           status: status,
         );
         await _libraryService.addToLibrary(libraryManga);
-        ScaffoldMessenger.of(
+        AlertBanner.show(
           context,
-        ).showSnackBar(SnackBar(content: Text('Added to library as $status')));
+          'Added to library as $status',
+          type: AlertBannerType.success,
+        );
       }
 
       if (mounted) {
@@ -253,9 +258,11 @@ class _MangaDetailScreenState extends State<MangaDetailScreen>
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(
+        AlertBanner.show(
           context,
-        ).showSnackBar(SnackBar(content: Text('Error: ${e.toString()}')));
+          'Error: ${e.toString()}',
+          type: AlertBannerType.error,
+        );
       }
     }
   }
@@ -528,9 +535,11 @@ class _MangaDetailScreenState extends State<MangaDetailScreen>
     } catch (e) {
       if (context.mounted) {
         Navigator.pop(context); // Close loading dialog
-        ScaffoldMessenger.of(
+        AlertBanner.show(
           context,
-        ).showSnackBar(SnackBar(content: Text('Failed to load chapter: $e')));
+          'Failed to load chapter: $e',
+          type: AlertBannerType.error,
+        );
       }
     }
   }
@@ -1082,22 +1091,26 @@ class _MangaDetailScreenState extends State<MangaDetailScreen>
             IconButton(
               onPressed: () async {
                 try {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Scraping chapters...')),
+                  AlertBanner.show(
+                    context,
+                    'Scraping chapters...',
+                    type: AlertBannerType.info,
                   );
                   await _apiService.scrapChapterPagesNew(manga.id);
                   if (context.mounted) {
                     Navigator.pop(context);
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('Chapter scraping queued successfully!'),
-                      ),
+                    AlertBanner.show(
+                      context,
+                      'Chapter scraping queued successfully!',
+                      type: AlertBannerType.success,
                     );
                   }
                 } catch (e) {
                   if (context.mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text('Failed to scrap chapters: $e')),
+                    AlertBanner.show(
+                      context,
+                      'Failed to scrap chapters: $e',
+                      type: AlertBannerType.error,
                     );
                   }
                 }
@@ -1597,9 +1610,11 @@ class _MangaDetailScreenState extends State<MangaDetailScreen>
     } catch (e) {
       if (mounted) {
         Navigator.pop(context);
-        ScaffoldMessenger.of(
+        AlertBanner.show(
           context,
-        ).showSnackBar(SnackBar(content: Text('Failed to load details: $e')));
+          'Failed to load details: $e',
+          type: AlertBannerType.error,
+        );
       }
     }
   }

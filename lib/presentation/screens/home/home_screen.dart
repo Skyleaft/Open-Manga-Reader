@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:cached_network_image_ce/cached_network_image.dart';
 import '../../../core/constants/app_colors.dart';
+import '../../../core/widgets/alert_banner.dart';
 import '../../../data/models/manga_summary.dart';
 import '../../../data/models/manga_detail.dart';
 import '../../../data/models/progression.dart';
@@ -196,9 +197,11 @@ class _HomeScreenState extends State<HomeScreen> {
     } catch (e) {
       if (!mounted) return;
       Navigator.pop(context);
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Failed to load details: $e')));
+          AlertBanner.show(
+            context,
+            'Failed to load details: $e',
+            type: AlertBannerType.error,
+          );
     }
   }
 
