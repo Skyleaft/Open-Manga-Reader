@@ -12,10 +12,6 @@ class ReaderBottomBar extends StatelessWidget {
   final ValueChanged<double> onProgressChangeEnd;
   final VoidCallback onNextChapter;
   final VoidCallback onPreviousChapter;
-  final bool isAutoScrolling;
-  final double autoScrollSpeed;
-  final VoidCallback onToggleAutoScroll;
-  final VoidCallback onSpeedChange;
 
   const ReaderBottomBar({
     super.key,
@@ -28,156 +24,101 @@ class ReaderBottomBar extends StatelessWidget {
     required this.onProgressChangeEnd,
     required this.onNextChapter,
     required this.onPreviousChapter,
-    required this.isAutoScrolling,
-    required this.autoScrollSpeed,
-    required this.onToggleAutoScroll,
-    required this.onSpeedChange,
   });
 
   @override
   Widget build(BuildContext context) {
     return ClipRRect(
-      borderRadius: BorderRadius.circular(32),
+      borderRadius: BorderRadius.circular(24),
       child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
+        filter: ImageFilter.blur(sigmaX: 15, sigmaY: 15),
         child: Container(
-          padding: const EdgeInsets.fromLTRB(16, 4, 16, 12),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
           decoration: BoxDecoration(
-            color: const Color.fromARGB(255, 45, 45, 45).withValues(alpha: 0.7),
-            borderRadius: BorderRadius.circular(32),
-            border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
+            color: Colors.black.withOpacity(0.65),
+            borderRadius: BorderRadius.circular(24),
+            border: Border.all(color: Colors.white.withOpacity(0.08)),
           ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              // Slider Row
+              // Segmented Progress Bar (Full width)
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 4.0),
+                child: _SegmentedProgressBar(
+                  totalPages: totalPages,
+                  currentPage: currentPage,
+                  onChanged: onProgressChanged,
+                  onChangeStart: onProgressChangeStart,
+                  onChangeEnd: onProgressChangeEnd,
+                ),
+              ),
+              const SizedBox(height: 10),
+              // Navigation and Page Info Row
               Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  IconButton(
-                    icon: const Icon(
-                      Icons.skip_previous_rounded,
-                      color: Colors.white70,
-                      size: 22,
-                    ),
-                    onPressed: onPreviousChapter,
-                    visualDensity: VisualDensity.compact,
+                  // Previous Chapter Button
+                  _buildNavButton(
+                    icon: Icons.skip_previous_rounded,
+                    onTap: onPreviousChapter,
+                    tooltip: 'Previous Chapter',
                   ),
-                  Expanded(
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 8.0),
-                      child: _SegmentedProgressBar(
-                        totalPages: totalPages,
-                        currentPage: currentPage,
-                        onChanged: onProgressChanged,
-                        onChangeStart: onProgressChangeStart,
-                        onChangeEnd: onProgressChangeEnd,
+                  
+                  // Page Counter Pill
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 6,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.06),
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: Colors.white.withOpacity(0.05)),
+                    ),
+                    child: Text(
+                      'PAGE $currentPage OF $totalPages  •  ${((progress * 100).toInt())}%',
+                      style: const TextStyle(
+                        color: Colors.white70,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                        letterSpacing: 0.8,
                       ),
                     ),
                   ),
-                  IconButton(
-                    icon: const Icon(
-                      Icons.skip_next_rounded,
-                      color: Colors.white70,
-                      size: 22,
-                    ),
-                    onPressed: onNextChapter,
-                    visualDensity: VisualDensity.compact,
+                  
+                  // Next Chapter Button
+                  _buildNavButton(
+                    icon: Icons.skip_next_rounded,
+                    onTap: onNextChapter,
+                    tooltip: 'Next Chapter',
                   ),
                 ],
-              ),
-              // Info Row
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 12),
-                child: Stack(
-                  alignment: Alignment.center,
-                  children: [
-                    Align(
-                      alignment: Alignment.centerLeft,
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          IconButton(
-                            icon: Icon(
-                              isAutoScrolling
-                                  ? Icons.pause_rounded
-                                  : Icons.play_arrow_rounded,
-                              color: isAutoScrolling
-                                  ? AppColors.primary
-                                  : Colors.white70,
-                              size: 24,
-                            ),
-                            onPressed: onToggleAutoScroll,
-                            visualDensity: VisualDensity.compact,
-                            padding: EdgeInsets.zero,
-                            constraints: const BoxConstraints(),
-                          ),
-                          AnimatedSize(
-                            duration: const Duration(milliseconds: 200),
-                            curve: Curves.easeOutCubic,
-                            child: isAutoScrolling
-                                ? Padding(
-                                    padding: const EdgeInsets.only(left: 8.0),
-                                    child: GestureDetector(
-                                      onTap: onSpeedChange,
-                                      child: Container(
-                                        padding: const EdgeInsets.symmetric(
-                                          horizontal: 8,
-                                          vertical: 4,
-                                        ),
-                                        decoration: BoxDecoration(
-                                          color: AppColors.primary.withValues(
-                                            alpha: 0.15,
-                                          ),
-                                          borderRadius: BorderRadius.circular(
-                                            12,
-                                          ),
-                                          border: Border.all(
-                                            color: AppColors.primary.withValues(
-                                              alpha: 0.3,
-                                            ),
-                                          ),
-                                        ),
-                                        child: Text(
-                                          '${autoScrollSpeed.toStringAsFixed(1)}x',
-                                          style: const TextStyle(
-                                            color: AppColors.primary,
-                                            fontSize: 10,
-                                            fontWeight: FontWeight.bold,
-                                          ),
-                                        ),
-                                      ),
-                                    ),
-                                  )
-                                : const SizedBox.shrink(),
-                          ),
-                        ],
-                      ),
-                    ),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 10,
-                        vertical: 4,
-                      ),
-                      decoration: BoxDecoration(
-                        color: Colors.black26,
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Text(
-                        'PAGE $currentPage OF $totalPages  •  ${((progress * 100).toInt())}%',
-                        style: const TextStyle(
-                          color: Colors.white70,
-                          fontSize: 10,
-                          fontWeight: FontWeight.w600,
-                          letterSpacing: 0.5,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
               ),
             ],
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _buildNavButton({
+    required IconData icon,
+    required VoidCallback onTap,
+    required String tooltip,
+  }) {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.06),
+        shape: BoxShape.circle,
+        border: Border.all(color: Colors.white.withOpacity(0.05)),
+      ),
+      child: IconButton(
+        icon: Icon(icon, color: Colors.white, size: 20),
+        onPressed: onTap,
+        tooltip: tooltip,
+        constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+        padding: EdgeInsets.zero,
       ),
     );
   }
@@ -223,14 +164,14 @@ class _SegmentedProgressBarState extends State<_SegmentedProgressBar> {
                 widget.totalPages,
               );
           return Positioned(
-            width: 34,
-            height: 34,
+            width: 42,
+            height: 42,
             child: CompositedTransformFollower(
               link: _layerLink,
               showWhenUnlinked: false,
               targetAnchor: Alignment.topLeft,
               followerAnchor: Alignment.topLeft,
-              offset: Offset(_dragProgress * width, 12),
+              offset: Offset(_dragProgress * width, 6),
               child: IgnorePointer(
                 child: FractionalTranslation(
                   translation: const Offset(-0.5, -1.0),
@@ -260,7 +201,7 @@ class _SegmentedProgressBarState extends State<_SegmentedProgressBar> {
                             style: const TextStyle(
                               color: Colors.white,
                               fontWeight: FontWeight.bold,
-                              fontSize: 11,
+                              fontSize: 12,
                             ),
                           ),
                         ),
