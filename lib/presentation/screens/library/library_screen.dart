@@ -279,6 +279,12 @@ class _LibraryScreenState extends State<LibraryScreen> {
     }
 
     final int totalChapters = detail?.chapters.length ?? 0;
+    final String displayAuthor =
+        (detail != null &&
+            detail.author.isNotEmpty &&
+            detail.author != 'Unknown Author')
+        ? detail.author
+        : manga.author;
 
     return GestureDetector(
       onTap: () async {
@@ -443,7 +449,7 @@ class _LibraryScreenState extends State<LibraryScreen> {
                             ),
                             const SizedBox(height: 4),
                             Text(
-                              'By ${manga.author} • ${manga.type}',
+                              'By $displayAuthor • ${manga.type}',
                               style: TextStyle(
                                 fontSize: 11,
                                 color: isDark

@@ -28,13 +28,22 @@ class _HistoryScreenState extends State<HistoryScreen> {
   final MangaApiService _apiService = getIt<MangaApiService>();
   final MangaDetailService _detailService = getIt<MangaDetailService>();
   List<MangaProgression> _progressions = [];
-  List<MangaDetail?> _mangaDetails = [];
+  Map<String, MangaDetail> _mangaDetailsMap = {};
   bool _isLoading = true;
+  String _selectedFilter = 'All';
+  String _searchQuery = '';
+  final TextEditingController _searchController = TextEditingController();
 
   @override
   void initState() {
     super.initState();
     _loadHistory();
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
   }
 
   Future<void> _loadHistory() async {
@@ -50,35 +59,42 @@ class _HistoryScreenState extends State<HistoryScreen> {
       }
 
       // Fetch manga details for each progression
-      final details = <MangaDetail?>[];
+      final detailsMap = <String, MangaDetail>{};
       for (final progression in progressions) {
         try {
           final cached = await _detailService.getDetail(progression.mangaId);
           if (cached != null) {
-            details.add(cached);
+            detailsMap[progression.mangaId] = cached;
 
             // Sync in background to keep data fresh without blocking UI
-            _apiService.getMangaDetail(progression.mangaId).then((data) {
-              final fresh = MangaDetail.fromMap(data);
-              _detailService.saveDetail(fresh);
-            }).catchError((_) {});
+            _apiService
+                .getMangaDetail(progression.mangaId)
+                .then((data) {
+                  final fresh = MangaDetail.fromMap(data);
+                  _detailService.saveDetail(fresh);
+                  if (mounted) {
+                    setState(() {
+                      _mangaDetailsMap[progression.mangaId] = fresh;
+                    });
+                  }
+                })
+                .catchError((_) {});
           } else {
             final detailData = await _apiService.getMangaDetail(
               progression.mangaId,
             );
             final mangaDetail = MangaDetail.fromMap(detailData);
             await _detailService.saveDetail(mangaDetail);
-            details.add(mangaDetail);
+            detailsMap[progression.mangaId] = mangaDetail;
           }
         } catch (e) {
-          // Add null to keep the lists aligned!
-          details.add(null);
+          // ignore error
         }
       }
 
       if (mounted) {
         setState(() {
-          _mangaDetails = details;
+          _mangaDetailsMap = detailsMap;
           _isLoading = false;
         });
       }
@@ -89,6 +105,43 @@ class _HistoryScreenState extends State<HistoryScreen> {
         });
       }
     }
+  }
+
+  bool _matchesFilter(DateTime dateTime, String filter) {
+    final localDateTime = dateTime.toLocal();
+    final now = DateTime.now();
+    final todayStart = DateTime(now.year, now.month, now.day);
+
+    if (filter == 'Today') {
+      return localDateTime.isAfter(todayStart) ||
+          localDateTime.isAtSameMomentAs(todayStart);
+    } else if (filter == 'This Week') {
+      final weekday = now.weekday;
+      final weekStart = todayStart.subtract(Duration(days: weekday - 1));
+      return localDateTime.isAfter(weekStart) ||
+          localDateTime.isAtSameMomentAs(weekStart);
+    } else if (filter == 'This Month') {
+      final monthStart = DateTime(now.year, now.month, 1);
+      return localDateTime.isAfter(monthStart) ||
+          localDateTime.isAtSameMomentAs(monthStart);
+    }
+    return true; // 'All'
+  }
+
+  List<MangaProgression> get _filteredProgressions {
+    return _progressions.where((progression) {
+      final matchesTime = _matchesFilter(progression.lastRead, _selectedFilter);
+      if (!matchesTime) return false;
+
+      if (_searchQuery.isNotEmpty) {
+        final detail = _mangaDetailsMap[progression.mangaId];
+        final title = detail?.title.toLowerCase() ?? 'unknown manga';
+        final query = _searchQuery.toLowerCase();
+        return title.contains(query);
+      }
+
+      return true;
+    }).toList();
   }
 
   @override
@@ -173,8 +226,14 @@ class _HistoryScreenState extends State<HistoryScreen> {
                   : AppColors.primary.withOpacity(0.1),
               borderRadius: BorderRadius.circular(12),
             ),
-            child: const TextField(
-              decoration: InputDecoration(
+            child: TextField(
+              controller: _searchController,
+              onChanged: (value) {
+                setState(() {
+                  _searchQuery = value;
+                });
+              },
+              decoration: const InputDecoration(
                 hintText: 'Search in history',
                 prefixIcon: Icon(Icons.search, size: 20, color: Colors.grey),
                 border: InputBorder.none,
@@ -188,10 +247,10 @@ class _HistoryScreenState extends State<HistoryScreen> {
             scrollDirection: Axis.horizontal,
             child: Row(
               children: [
-                _buildFilterChip('All', true),
-                _buildFilterChip('Today', false),
-                _buildFilterChip('This Week', false),
-                _buildFilterChip('This Month', false),
+                _buildFilterChip('All'),
+                _buildFilterChip('Today'),
+                _buildFilterChip('This Week'),
+                _buildFilterChip('This Month'),
               ],
             ),
           ),
@@ -200,22 +259,30 @@ class _HistoryScreenState extends State<HistoryScreen> {
     );
   }
 
-  Widget _buildFilterChip(String label, bool isActive) {
-    return Container(
-      margin: const EdgeInsets.only(right: 8),
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      decoration: BoxDecoration(
-        color: isActive
-            ? AppColors.primary
-            : Colors.grey[200]!.withOpacity(0.2),
-        borderRadius: BorderRadius.circular(20),
-      ),
-      child: Text(
-        label,
-        style: TextStyle(
-          color: isActive ? Colors.white : Colors.grey,
-          fontSize: 13,
-          fontWeight: FontWeight.w500,
+  Widget _buildFilterChip(String label) {
+    final isActive = _selectedFilter == label;
+    return GestureDetector(
+      onTap: () {
+        setState(() {
+          _selectedFilter = label;
+        });
+      },
+      child: Container(
+        margin: const EdgeInsets.only(right: 8),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        decoration: BoxDecoration(
+          color: isActive
+              ? AppColors.primary
+              : Colors.grey[200]!.withOpacity(0.2),
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            color: isActive ? Colors.white : Colors.grey,
+            fontSize: 13,
+            fontWeight: FontWeight.w500,
+          ),
         ),
       ),
     );
@@ -234,15 +301,18 @@ class _HistoryScreenState extends State<HistoryScreen> {
       );
     }
 
-    if (_progressions.isEmpty) {
+    final filtered = _filteredProgressions;
+    if (filtered.isEmpty) {
       return SliverToBoxAdapter(
         child: Container(
           color: isDark ? AppColors.backgroundDark : AppColors.backgroundLight,
           padding: const EdgeInsets.all(24.0),
-          child: const Center(
+          child: Center(
             child: Text(
-              'No reading history yet\nStart reading manga to see your progress here!',
-              style: TextStyle(color: Colors.grey, fontSize: 16),
+              _searchQuery.isNotEmpty || _selectedFilter != 'All'
+                  ? 'No matching history found'
+                  : 'No reading history yet\nStart reading manga to see your progress here!',
+              style: const TextStyle(color: Colors.grey, fontSize: 16),
               textAlign: TextAlign.center,
             ),
           ),
@@ -252,13 +322,11 @@ class _HistoryScreenState extends State<HistoryScreen> {
 
     return SliverList(
       delegate: SliverChildBuilderDelegate((context, index) {
-        final progression = _progressions[index];
-        final mangaDetail = index < _mangaDetails.length
-            ? _mangaDetails[index]
-            : null;
+        final progression = filtered[index];
+        final mangaDetail = _mangaDetailsMap[progression.mangaId];
 
         return _buildHistoryItem(context, progression, mangaDetail, isDark);
-      }, childCount: _progressions.length),
+      }, childCount: filtered.length),
     );
   }
 
@@ -269,7 +337,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
     bool isDark,
   ) {
     final formatter = DateFormat('MMM d, yyyy • HH:mm');
-    final lastReadFormatted = formatter.format(progression.lastRead);
+    final lastReadFormatted = formatter.format(progression.lastRead.toLocal());
 
     return Container(
       margin: const EdgeInsets.only(bottom: 16),

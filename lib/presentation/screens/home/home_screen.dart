@@ -1,10 +1,13 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:cached_network_image_ce/cached_network_image.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../data/models/manga_summary.dart';
 import '../../../data/models/manga_detail.dart';
+import '../../../data/models/progression.dart';
 import '../../../data/services/manga_api_service.dart';
+import '../../../data/services/manga_detail_service.dart';
 import '../../../data/services/progression_service.dart';
 import '../../../data/services/auth_service.dart';
 import '../../../core/di/injection.dart';
@@ -22,11 +25,18 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   final MangaApiService _apiService = getIt<MangaApiService>();
+  final ProgressionService _progressionService = getIt<ProgressionService>();
+  final MangaDetailService _detailService = getIt<MangaDetailService>();
 
   List<MangaSummary> _trendingManga = [];
   List<MangaSummary> _latestUpdates = [];
   List<MangaSummary> _recommendedManga = [];
   List<MangaSummary> _topManga = [];
+
+  // History
+  List<MangaProgression> _recentProgressions = [];
+  Map<String, MangaDetail> _historyDetailsMap = {};
+  bool _isLoadingHistory = true;
 
   bool _isLoadingTrending = true;
   bool _isLoadingLatest = true;
@@ -40,9 +50,46 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _fetchData() async {
+    _fetchHistory();
     _fetchTrending();
     _fetchLatest();
     _fetchTop().then((_) => _fetchRecommended());
+  }
+
+  Future<void> _fetchHistory() async {
+    if (mounted) {
+      setState(() => _isLoadingHistory = true);
+    }
+    try {
+      final progressions = await _progressionService.getAllProgressions();
+      progressions.sort((a, b) => b.lastRead.compareTo(a.lastRead));
+      final recent = progressions.take(10).toList();
+
+      final detailsMap = <String, MangaDetail>{};
+      for (final p in recent) {
+        try {
+          final cached = await _detailService.getDetail(p.mangaId);
+          if (cached != null) {
+            detailsMap[p.mangaId] = cached;
+          } else {
+            final data = await _apiService.getMangaDetail(p.mangaId);
+            final detail = MangaDetail.fromMap(data);
+            await _detailService.saveDetail(detail);
+            detailsMap[p.mangaId] = detail;
+          }
+        } catch (_) {}
+      }
+
+      if (mounted) {
+        setState(() {
+          _recentProgressions = recent;
+          _historyDetailsMap = detailsMap;
+          _isLoadingHistory = false;
+        });
+      }
+    } catch (_) {
+      if (mounted) setState(() => _isLoadingHistory = false);
+    }
   }
 
   Future<void> _fetchTrending() async {
@@ -190,6 +237,8 @@ class _HomeScreenState extends State<HomeScreen> {
               sliver: SliverList(
                 delegate: SliverChildListDelegate([
                   const SizedBox(height: 24),
+                  _buildContinueReading(context, isDark),
+                  const SizedBox(height: 32),
                   _buildTrendingManga(context),
                   const SizedBox(height: 32),
                   _buildLatestUpdates(context, isDark),
@@ -248,6 +297,246 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildContinueReading(BuildContext context, bool isDark) {
+    // Don't show section at all if loading is done and there's nothing to show
+    if (!_isLoadingHistory && _recentProgressions.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    width: 4,
+                    height: 20,
+                    decoration: BoxDecoration(
+                      color: AppColors.primary,
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  const Text(
+                    'Continue Reading',
+                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                  ),
+                ],
+              ),
+              TextButton(
+                onPressed: () {
+                  Navigator.pushNamed(context, AppRoutes.history);
+                },
+                child: const Text(
+                  'View all',
+                  style: TextStyle(
+                    color: AppColors.primary,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 12),
+        SizedBox(
+          height: 180,
+          child: _isLoadingHistory
+              ? const Center(
+                  child: CircularProgressIndicator(color: AppColors.primary),
+                )
+              : ListView.builder(
+                  scrollDirection: Axis.horizontal,
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  itemCount: _recentProgressions.length,
+                  itemBuilder: (context, index) {
+                    final progression = _recentProgressions[index];
+                    final detail = _historyDetailsMap[progression.mangaId];
+                    return _buildHistoryCard(
+                      context,
+                      progression,
+                      detail,
+                      isDark,
+                    );
+                  },
+                ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildHistoryCard(
+    BuildContext context,
+    MangaProgression progression,
+    MangaDetail? detail,
+    bool isDark,
+  ) {
+    final imageUrl = detail != null
+        ? _apiService.getLocalImageUrl(detail.localImageUrl, detail.imageUrl)
+        : '';
+    final title = detail?.title ?? 'Unknown Manga';
+    final progress = progression.progressPercentage;
+    final now = DateTime.now();
+    final diff = now.difference(progression.lastRead.toLocal());
+    String timeAgo;
+    if (diff.inDays >= 1) {
+      timeAgo = '${diff.inDays}d ago';
+    } else if (diff.inHours >= 1) {
+      timeAgo = '${diff.inHours}h ago';
+    } else if (diff.inMinutes >= 1) {
+      timeAgo = '${diff.inMinutes}m ago';
+    } else {
+      timeAgo = 'Just now';
+    }
+
+    return GestureDetector(
+      onTap: () async {
+        if (detail != null) {
+          Navigator.pushNamed(context, AppRoutes.detail, arguments: detail);
+        }
+      },
+      child: Container(
+        width: 140,
+        margin: const EdgeInsets.only(right: 14),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(16),
+          color: isDark ? AppColors.slate800.withOpacity(0.9) : Colors.white,
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.10),
+              blurRadius: 10,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(16),
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              // Cover image
+              imageUrl.isNotEmpty
+                  ? CachedNetworkImage(
+                      imageUrl: imageUrl,
+                      fit: BoxFit.cover,
+                      placeholder: (_, __) => Container(
+                        color: isDark ? Colors.grey[800] : Colors.grey[200],
+                      ),
+                      errorBuilder: (_, __, ___) => Container(
+                        color: isDark ? Colors.grey[800] : Colors.grey[200],
+                        child: const Icon(
+                          Icons.image_not_supported,
+                          color: Colors.grey,
+                        ),
+                      ),
+                    )
+                  : Container(
+                      color: isDark ? Colors.grey[800] : Colors.grey[200],
+                      child: const Icon(
+                        Icons.image_not_supported,
+                        color: Colors.grey,
+                      ),
+                    ),
+
+              // Gradient overlay
+              Positioned.fill(
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      stops: const [0.3, 1.0],
+                      colors: [
+                        Colors.transparent,
+                        Colors.black.withOpacity(0.88),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+
+              // Time badge top-right
+              Positioned(
+                top: 8,
+                right: 8,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 6,
+                    vertical: 3,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Colors.black.withOpacity(0.55),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Text(
+                    timeAgo,
+                    style: const TextStyle(
+                      color: Colors.white70,
+                      fontSize: 9,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ),
+
+              // Bottom content
+              Positioned(
+                bottom: 0,
+                left: 0,
+                right: 0,
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(10, 0, 10, 10),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        title,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold,
+                          height: 1.3,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'Ch. ${progression.currentChapter.toInt()}  •  Pg. ${progression.currentPage}/${progression.totalPages}',
+                        style: const TextStyle(
+                          color: Colors.white60,
+                          fontSize: 9,
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      // Progress bar
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(4),
+                        child: LinearProgressIndicator(
+                          value: progress,
+                          minHeight: 3,
+                          backgroundColor: Colors.white24,
+                          valueColor: const AlwaysStoppedAnimation<Color>(
+                            AppColors.primary,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
