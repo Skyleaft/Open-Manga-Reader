@@ -138,6 +138,36 @@ class MangaApiService {
     }
   }
 
+  Future<PagedResponse<MangaSummary>> getTrending({
+    String? search,
+    List<String>? genres,
+    String? status,
+    String? type,
+    int page = 1,
+    int pageSize = 10,
+  }) async {
+    try {
+      final response = await _dio.get(
+        '/api/manga/trending',
+        queryParameters: {
+          if (search != null) 'search': search,
+          if (genres != null && genres.isNotEmpty) 'genres': genres,
+          if (status != null) 'status': status,
+          if (type != null) 'type': type,
+          'page': page,
+          'pageSize': pageSize,
+        },
+      );
+
+      return PagedResponse.fromJson(
+        response.data as Map<String, dynamic>,
+        (json) => MangaSummary.fromJson(json),
+      );
+    } catch (e) {
+      rethrow;
+    }
+  }
+
   Future<List<MangaSummary>> getRecommendations({
     List<String>? readingHistoryIds,
     int limit = 10,
