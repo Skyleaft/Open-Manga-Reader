@@ -46,10 +46,10 @@ class MangaDetail {
   factory MangaDetail.fromMap(Map<String, dynamic> map) {
     return MangaDetail(
       id: map['id'] as String? ?? '',
-      malId: map['malId'] as int? ?? 0,
+      malId: map['malId'] as int? ?? map['malID'] as int? ?? 0,
       title: map['title'] as String? ?? 'Unknown Title',
       author: map['author'] as String? ?? 'Unknown Author',
-      type: map['type'] as String,
+      type: map['type'] as String? ?? 'Unknown Type',
       genres: (map['genres'] as List<dynamic>?)
           ?.map((e) => e as String)
           .toList(),

@@ -274,20 +274,42 @@ class MangaApiService {
       return '$baseUrl/$localPath';
     }
 
-    String cleanLocalPath = localPath.startsWith('/') ? localPath.substring(1) : localPath;
+    String cleanLocalPath = localPath.startsWith('/')
+        ? localPath.substring(1)
+        : localPath;
     return '$baseUrl/api/images/$cleanLocalPath';
   }
 
   Future<void> scrapManga(
     String mangaUrl,
     bool scrapChapters,
-    String provider,
-  ) async {
+    String provider, {
+    String? linkId,
+  }) async {
     try {
       await _dio.post(
         '/api/scrapper/$provider/manga',
-        data: {'mangaUrl': mangaUrl, 'scrapChapterPages': scrapChapters},
+        data: {
+          'mangaUrl': mangaUrl,
+          'scrapChapterPages': scrapChapters,
+          if (linkId != null) 'linkId': linkId,
+        },
       );
+    } catch (e) {
+      rethrow;
+    }
+  }
+
+  Future<Map<String, dynamic>> getScrapMangaDetail({
+    required String provider,
+    required String mangaUrl,
+  }) async {
+    try {
+      final response = await _dio.get(
+        '/api/scrapper/$provider/manga/detail',
+        queryParameters: {'mangaUrl': mangaUrl},
+      );
+      return response.data as Map<String, dynamic>;
     } catch (e) {
       rethrow;
     }
