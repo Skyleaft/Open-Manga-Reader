@@ -40,6 +40,9 @@ class _MangaDetailScreenState extends State<MangaDetailScreen>
   bool _isLoadingChapters = true;
   bool _isInLibrary = false;
   Future<List<MangaProgression>>? _progressionsFuture;
+  final TextEditingController _searchController = TextEditingController();
+  bool _isSearching = false;
+  String _searchQuery = '';
 
   late TabController _tabController;
   List<MangaSummary> _recommendations = [];
@@ -85,6 +88,7 @@ class _MangaDetailScreenState extends State<MangaDetailScreen>
 
   @override
   void dispose() {
+    _searchController.dispose();
     _tabController.dispose();
     super.dispose();
   }
@@ -374,14 +378,19 @@ class _MangaDetailScreenState extends State<MangaDetailScreen>
                           size: 20,
                         ),
                         onPressed: () {
-                          final String shareUrl = '${AppConfig.baseUrl}/manga/${manga.id}';
-                          final String customSchemeUrl = 'skyleaft-manga://manga/${manga.id}';
+                          final String shareUrl =
+                              '${AppConfig.baseUrl}/manga/${manga.id}';
+                          final String customSchemeUrl =
+                              'skyleaft-manga://manga/${manga.id}';
                           final String shareText =
                               'Check out ${manga.title} on My Manga Reader!\n\n'
                               'Read it here: $shareUrl\n'
                               'Or open in app: $customSchemeUrl';
 
-                          Share.share(shareText, subject: 'Share ${manga.title}');
+                          Share.share(
+                            shareText,
+                            subject: 'Share ${manga.title}',
+                          );
                         },
                       ),
                     ),
@@ -1075,6 +1084,70 @@ class _MangaDetailScreenState extends State<MangaDetailScreen>
   }
 
   Widget _buildChapterListHeader(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    if (_isSearching) {
+      return Container(
+        height: 48,
+        decoration: BoxDecoration(
+          color: isDark
+              ? AppColors.slate700.withValues(alpha: 0.3)
+              : AppColors.primary.withValues(alpha: 0.08),
+          borderRadius: BorderRadius.circular(24),
+        ),
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        child: Row(
+          children: [
+            const Icon(Icons.search, color: AppColors.primary, size: 20),
+            const SizedBox(width: 8),
+            Expanded(
+              child: TextField(
+                controller: _searchController,
+                keyboardType: const TextInputType.numberWithOptions(
+                  decimal: true,
+                ),
+                autofocus: true,
+                style: TextStyle(
+                  color: isDark ? Colors.white : Colors.black87,
+                  fontSize: 14,
+                ),
+                decoration: InputDecoration(
+                  hintText: 'Search chapter number...',
+                  hintStyle: TextStyle(
+                    color: (isDark ? Colors.white70 : Colors.black54)
+                        .withValues(alpha: 0.5),
+                    fontSize: 14,
+                  ),
+                  border: InputBorder.none,
+                  isDense: true,
+                  contentPadding: EdgeInsets.zero,
+                ),
+                onChanged: (value) {
+                  setState(() {
+                    _searchQuery = value.trim();
+                  });
+                },
+              ),
+            ),
+            IconButton(
+              icon: Icon(
+                Icons.close,
+                color: isDark ? Colors.white70 : Colors.black54,
+                size: 20,
+              ),
+              onPressed: () {
+                setState(() {
+                  _isSearching = false;
+                  _searchQuery = '';
+                  _searchController.clear();
+                });
+              },
+            ),
+          ],
+        ),
+      );
+    }
+
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
@@ -1088,6 +1161,18 @@ class _MangaDetailScreenState extends State<MangaDetailScreen>
         ),
         Row(
           children: [
+            IconButton(
+              onPressed: () {
+                setState(() {
+                  _isSearching = true;
+                });
+              },
+              icon: const Icon(
+                Icons.search,
+                color: AppColors.primary,
+                size: 20,
+              ),
+            ),
             IconButton(
               onPressed: () async {
                 try {
@@ -1164,15 +1249,25 @@ class _MangaDetailScreenState extends State<MangaDetailScreen>
       );
     }
 
-    if (_chapters.isEmpty) {
+    final filteredChapters = _chapters.where((chapter) {
+      if (_searchQuery.isEmpty) return true;
+      final numStr = chapter.chapterNumber % 1 == 0
+          ? chapter.chapterNumber.toInt().toString()
+          : chapter.chapterNumber.toString();
+      return numStr.contains(_searchQuery);
+    }).toList();
+
+    if (filteredChapters.isEmpty) {
       return SliverToBoxAdapter(
         child: Container(
           color: bgColor,
           padding: const EdgeInsets.all(24.0),
-          child: const Center(
+          child: Center(
             child: Text(
-              'No chapters available',
-              style: TextStyle(color: Colors.grey),
+              _searchQuery.isEmpty
+                  ? 'No chapters available'
+                  : 'No chapters matching "$_searchQuery"',
+              style: const TextStyle(color: Colors.grey),
             ),
           ),
         ),
@@ -1181,13 +1276,13 @@ class _MangaDetailScreenState extends State<MangaDetailScreen>
 
     return SliverList(
       delegate: SliverChildBuilderDelegate((context, index) {
-        final chapter = _chapters[index];
+        final chapter = filteredChapters[index];
         return Container(
           color: bgColor,
           padding: const EdgeInsets.fromLTRB(24, 0, 24, 12),
           child: _buildChapterItem(context, chapter, isDark),
         );
-      }, childCount: _chapters.length),
+      }, childCount: filteredChapters.length),
     );
   }
 
@@ -1215,154 +1310,214 @@ class _MangaDetailScreenState extends State<MangaDetailScreen>
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
-                  // Left side: Chapter number and info
-                  Row(
-                    children: [
-                      // Chapter number circle
-                      Container(
-                        width: 48,
-                        height: 48,
-                        decoration: BoxDecoration(
-                          color: isDark
-                              ? AppColors.slate700.withValues(alpha: 0.4)
-                              : AppColors.primary.withValues(alpha: 0.1),
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Center(
-                          child: Text(
-                            chapter.chapterNumber.toInt().toString(),
-                            style: TextStyle(
-                              fontWeight: FontWeight.bold,
-                              fontSize: 16,
-                              color: textColor,
-                            ),
-                          ),
+                  // Chapter number circle/box
+                  Container(
+                    width: 48,
+                    height: 48,
+                    decoration: BoxDecoration(
+                      color: isDark
+                          ? AppColors.slate700.withValues(alpha: 0.4)
+                          : AppColors.primary.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Center(
+                      child: Text(
+                        chapter.chapterNumber % 1 == 0
+                            ? chapter.chapterNumber.toInt().toString()
+                            : chapter.chapterNumber.toString(),
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 16,
+                          color: textColor,
                         ),
                       ),
-                      const SizedBox(width: 12),
-                      // Chapter info
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              Text(
-                                chapter.title,
-                                style: TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 14,
-                                  color: textColor,
-                                ),
-                              ),
-                              const SizedBox(width: 8),
-                              // Provider badge icon
-                              if (chapter.chapterProviderIcon != null)
-                                Container(
-                                  width: 16,
-                                  height: 16,
-                                  decoration: BoxDecoration(
-                                    color: Colors.white.withOpacity(0.1),
-                                    borderRadius: BorderRadius.circular(4),
-                                  ),
-                                  child:
-                                      chapter.chapterProviderIcon!
-                                          .toLowerCase()
-                                          .endsWith('.ico')
-                                      ? Icon(
-                                          Icons.link,
-                                          size: 14,
-                                          color: textColor.withOpacity(0.5),
-                                        )
-                                      : CachedNetworkImage(
-                                          imageUrl:
-                                              chapter.chapterProviderIcon!,
-                                          width: 16,
-                                          height: 16,
-                                          errorBuilder:
-                                              (context, error, stackTrace) =>
-                                                  Icon(
-                                                    Icons.link,
-                                                    size: 14,
-                                                    color: textColor
-                                                        .withOpacity(0.5),
-                                                  ),
-                                        ),
-                                ),
-                              const SizedBox(width: 8),
-                              Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Icon(
-                                    Icons.remove_red_eye_outlined,
-                                    color:
-                                        (Theme.of(context).brightness ==
-                                                    Brightness.dark
-                                                ? Colors.white
-                                                : Colors.black87)
-                                            .withOpacity(0.5),
-                                    size: 14,
-                                  ),
-                                  const SizedBox(width: 4),
-                                  Text(
-                                    formatViewCount(chapter.totalView),
-                                    style: TextStyle(
-                                      color:
-                                          (Theme.of(context).brightness ==
-                                                      Brightness.dark
-                                                  ? Colors.white
-                                                  : Colors.black87)
-                                              .withOpacity(0.5),
-                                      fontSize: 10,
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 4),
-                          Row(
-                            children: [
-                              Text(
-                                DateFormat('MMM dd, yyyy').format(chapter.date),
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  color: textColor.withOpacity(0.7),
-                                ),
-                              ),
-                              const SizedBox(width: 4),
-                              Text(
-                                '·',
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  color: textColor.withOpacity(0.5),
-                                ),
-                              ),
-                              const SizedBox(width: 4),
-                              Text(
-                                timeAgo(chapter.date),
-                                style: TextStyle(
-                                  fontSize: 11,
-                                  fontStyle: FontStyle.italic,
-                                  color: textColor.withOpacity(0.5),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
-                    ],
+                    ),
                   ),
+                  const SizedBox(width: 12),
+                  // Chapter info
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          chapter.title,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 15,
+                            color: textColor,
+                          ),
+                        ),
+                        const SizedBox(height: 6),
+                        Wrap(
+                          spacing: 6,
+                          runSpacing: 4,
+                          crossAxisAlignment: WrapCrossAlignment.center,
+                          children: [
+                            // Language Badge
+                            if (chapter.language.isNotEmpty)
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 6,
+                                  vertical: 2,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: AppColors.primary.withValues(
+                                    alpha: 0.15,
+                                  ),
+                                  borderRadius: BorderRadius.circular(4),
+                                  border: Border.all(
+                                    color: AppColors.primary.withValues(
+                                      alpha: 0.3,
+                                    ),
+                                    width: 0.5,
+                                  ),
+                                ),
+                                child: Text(
+                                  chapter.language.toUpperCase(),
+                                  style: const TextStyle(
+                                    fontSize: 9,
+                                    fontWeight: FontWeight.bold,
+                                    color: AppColors.primary,
+                                  ),
+                                ),
+                              ),
+
+                            // Provider Badge
+                            if (chapter.chapterProvider != null &&
+                                chapter.chapterProvider!.isNotEmpty)
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 6,
+                                  vertical: 2,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: isDark
+                                      ? Colors.white.withValues(alpha: 0.08)
+                                      : Colors.black.withValues(alpha: 0.05),
+                                  borderRadius: BorderRadius.circular(4),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    if (chapter.chapterProviderIcon !=
+                                        null) ...[
+                                      Container(
+                                        width: 12,
+                                        height: 12,
+                                        margin: const EdgeInsets.only(right: 4),
+                                        child:
+                                            chapter.chapterProviderIcon!
+                                                .toLowerCase()
+                                                .endsWith('.ico')
+                                            ? Icon(
+                                                Icons.link,
+                                                size: 10,
+                                                color: textColor.withValues(
+                                                  alpha: 0.6,
+                                                ),
+                                              )
+                                            : CachedNetworkImage(
+                                                imageUrl: chapter
+                                                    .chapterProviderIcon!,
+                                                width: 12,
+                                                height: 12,
+                                                errorBuilder:
+                                                    (
+                                                      context,
+                                                      error,
+                                                      stackTrace,
+                                                    ) => Icon(
+                                                      Icons.link,
+                                                      size: 10,
+                                                      color: textColor
+                                                          .withValues(
+                                                            alpha: 0.6,
+                                                          ),
+                                                    ),
+                                              ),
+                                      ),
+                                    ],
+                                    Text(
+                                      chapter.chapterProvider!,
+                                      style: TextStyle(
+                                        fontSize: 9,
+                                        fontWeight: FontWeight.w600,
+                                        color: textColor.withValues(alpha: 0.7),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+
+                            // View Count
+                            Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  Icons.remove_red_eye_outlined,
+                                  color: textColor.withValues(alpha: 0.5),
+                                  size: 12,
+                                ),
+                                const SizedBox(width: 3),
+                                Text(
+                                  formatViewCount(chapter.totalView),
+                                  style: TextStyle(
+                                    color: textColor.withValues(alpha: 0.5),
+                                    fontSize: 9,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 6),
+                        // Date row
+                        Row(
+                          children: [
+                            Text(
+                              DateFormat('MMM dd, yyyy').format(chapter.date),
+                              style: TextStyle(
+                                fontSize: 11,
+                                color: textColor.withValues(alpha: 0.6),
+                              ),
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              '·',
+                              style: TextStyle(
+                                fontSize: 11,
+                                color: textColor.withValues(alpha: 0.4),
+                              ),
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              timeAgo(chapter.date),
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontStyle: FontStyle.italic,
+                                color: textColor.withValues(alpha: 0.5),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 8),
                   // Right side: Status and arrow
                   Row(
+                    mainAxisSize: MainAxisSize.min,
                     children: [
                       _buildCompletionBadge(chapter),
-                      const SizedBox(width: 8),
+                      const SizedBox(width: 4),
                       Icon(
                         Icons.chevron_right,
-                        color: textColor.withOpacity(0.3),
+                        color: textColor.withValues(alpha: 0.3),
                         size: 20,
                       ),
                     ],
@@ -1407,10 +1562,9 @@ class _MangaDetailScreenState extends State<MangaDetailScreen>
             snapshot.data != null &&
             snapshot.data!.any((p) {
               if (p.mangaId != manga.id) return false;
-              if (p.currentChapter == chapterNumber && p.isCompleted)
-                return true;
-              if (p.currentChapter > chapterNumber) return true;
-              return false;
+              return p.chapterLogs.any(
+                (log) => log.chapterNumber == chapterNumber && log.isCompleted,
+              );
             });
 
         return Row(
@@ -1480,18 +1634,25 @@ class _MangaDetailScreenState extends State<MangaDetailScreen>
 
         final progressions = snapshot.data!;
         final progression = progressions.firstWhereOrNull(
-          (p) => p.mangaId == manga.id && p.currentChapter == chapterNumber,
+          (p) => p.mangaId == manga.id,
+        );
+        final log = progression?.chapterLogs.firstWhereOrNull(
+          (l) => l.chapterNumber == chapterNumber,
         );
 
-        if (progression == null || progression.isCompleted) {
+        if (log == null || log.isCompleted) {
           return const SizedBox.shrink();
         }
+
+        final double progressPercentage = log.totalPages <= 0
+            ? 0.0
+            : (log.lastReadPage / log.totalPages).clamp(0.0, 1.0);
 
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             LinearProgressIndicator(
-              value: progression.progressPercentage,
+              value: progressPercentage,
               backgroundColor: Colors.white10,
               valueColor: const AlwaysStoppedAnimation<Color>(
                 AppColors.primary,
@@ -1503,7 +1664,7 @@ class _MangaDetailScreenState extends State<MangaDetailScreen>
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Text(
-                  'Progress: ${(progression.progressPercentage * 100).toStringAsFixed(1)}%',
+                  'Progress: ${(progressPercentage * 100).toStringAsFixed(1)}%',
                   style: const TextStyle(fontSize: 10, color: Colors.grey),
                 ),
               ],

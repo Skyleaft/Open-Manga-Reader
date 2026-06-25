@@ -246,6 +246,39 @@
         }
       }
     },
+    "/api/scrapper/jikan/search": {
+      "get": {
+        "tags": [
+          "Scrapper"
+        ],
+        "operationId": "MangaScrapperFeaturesScrapperSearchJikanEndpoint",
+        "parameters": [
+          {
+            "name": "title",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/MangaScrapperSharedModelsJikanMangaItem"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/scrapper/manga/{mangaId}/chapter-pages": {
       "get": {
         "tags": [
@@ -316,6 +349,19 @@
         }
       }
     },
+    "/api/scrapper/fixlanguage": {
+      "get": {
+        "tags": [
+          "Scrapper"
+        ],
+        "operationId": "MangaScrapperFeaturesScrapperFixLanguageEndpoint",
+        "responses": {
+          "204": {
+            "description": "No Content"
+          }
+        }
+      }
+    },
     "/api/scrapper/fixfile": {
       "get": {
         "tags": [
@@ -338,6 +384,140 @@
         "responses": {
           "204": {
             "description": "No Content"
+          }
+        }
+      }
+    },
+    "/api/scrapper/mangadex/manga/search": {
+      "get": {
+        "tags": [
+          "Scrapper"
+        ],
+        "operationId": "MangaScrapperFeaturesScrapperMangadexSearchEndpoint",
+        "parameters": [
+          {
+            "name": "keyword",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "nullable": true
+            }
+          },
+          {
+            "name": "genres",
+            "in": "query",
+            "style": "form",
+            "explode": true,
+            "schema": {
+              "type": "array",
+              "nullable": true,
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "nullable": true
+            }
+          },
+          {
+            "name": "type",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "nullable": true
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/MangaScrapperInfrastructureModelsSearchItem"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/scrapper/mangadex/manga": {
+      "post": {
+        "tags": [
+          "Scrapper"
+        ],
+        "operationId": "MangaScrapperFeaturesScrapperMangadexScrapEndpoint",
+        "requestBody": {
+          "x-name": "Request",
+          "description": "",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MangaScrapperFeaturesScrapperMangadexScrapRequest"
+              }
+            }
+          },
+          "required": true,
+          "x-position": 1
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MangaScrapperInfrastructureMongoCollectionsMangaDocument"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/scrapper/mangadex/manga/detail": {
+      "get": {
+        "tags": [
+          "Scrapper"
+        ],
+        "operationId": "MangaScrapperFeaturesScrapperMangadexGetDetailEndpoint",
+        "parameters": [
+          {
+            "name": "mangaUrl",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MangaScrapperInfrastructureMongoCollectionsMangaDocument"
+                }
+              }
+            }
           }
         }
       }
@@ -432,6 +612,170 @@
           "required": true,
           "x-position": 1
         },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MangaScrapperInfrastructureMongoCollectionsMangaDocument"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/scrapper/komiku/manga/detail": {
+      "get": {
+        "tags": [
+          "Scrapper"
+        ],
+        "operationId": "MangaScrapperFeaturesScrapperKomikuGetDetailEndpoint",
+        "parameters": [
+          {
+            "name": "mangaUrl",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MangaScrapperInfrastructureMongoCollectionsMangaDocument"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/scrapper/komikcast/manga/search": {
+      "get": {
+        "tags": [
+          "Scrapper"
+        ],
+        "operationId": "MangaScrapperFeaturesScrapperKomikcastSearchEndpoint",
+        "parameters": [
+          {
+            "name": "keyword",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "nullable": true
+            }
+          },
+          {
+            "name": "genres",
+            "in": "query",
+            "style": "form",
+            "explode": true,
+            "schema": {
+              "type": "array",
+              "nullable": true,
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "nullable": true
+            }
+          },
+          {
+            "name": "type",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "nullable": true
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/MangaScrapperInfrastructureModelsSearchItem"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/scrapper/komikcast/manga": {
+      "post": {
+        "tags": [
+          "Scrapper"
+        ],
+        "operationId": "MangaScrapperFeaturesScrapperKomikcastScrapEndpoint",
+        "requestBody": {
+          "x-name": "Request",
+          "description": "",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MangaScrapperFeaturesScrapperKomikcastScrapRequest"
+              }
+            }
+          },
+          "required": true,
+          "x-position": 1
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MangaScrapperInfrastructureMongoCollectionsMangaDocument"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/scrapper/komikcast/manga/detail": {
+      "get": {
+        "tags": [
+          "Scrapper"
+        ],
+        "operationId": "MangaScrapperFeaturesScrapperKomikcastGetDetailEndpoint",
+        "parameters": [
+          {
+            "name": "mangaUrl",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "description": "Success",
@@ -550,19 +894,116 @@
         }
       }
     },
-    "/api/scrapper/kiryuu/manga/pages": {
-      "post": {
+    "/api/scrapper/kiryuu/manga/detail": {
+      "get": {
         "tags": [
           "Scrapper"
         ],
-        "operationId": "MangaScrapperFeaturesScrapperKiryuuGetSingleChapterPagesEndpoint",
+        "operationId": "MangaScrapperFeaturesScrapperKiryuuGetDetailEndpoint",
+        "parameters": [
+          {
+            "name": "mangaUrl",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MangaScrapperInfrastructureMongoCollectionsMangaDocument"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/recurring-jobs/{jobId}/trigger": {
+      "get": {
+        "tags": [
+          "Recurring-Jobs"
+        ],
+        "operationId": "MangaScrapperFeaturesRecurringJobsTriggerEndpoint",
+        "parameters": [
+          {
+            "name": "jobId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MangaScrapperFeaturesRecurringJobsTriggerResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        },
+        "security": [
+          {
+            "JWTBearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/recurring-jobs": {
+      "get": {
+        "tags": [
+          "Recurring-Jobs"
+        ],
+        "operationId": "MangaScrapperFeaturesRecurringJobsGetEndpoint",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/MangaScrapperFeaturesRecurringJobsGetRecurringJobDto"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        },
+        "security": [
+          {
+            "JWTBearerAuth": []
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "Recurring-Jobs"
+        ],
+        "operationId": "MangaScrapperFeaturesRecurringJobsCreateOrUpdateEndpoint",
         "requestBody": {
           "x-name": "Request",
           "description": "",
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/MangaScrapperFeaturesScrapperKiryuuGetSingleChapterPagesRequest"
+                "$ref": "#/components/schemas/MangaScrapperFeaturesRecurringJobsCreateOrUpdateRequest"
               }
             }
           },
@@ -575,31 +1016,35 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/MangaScrapperInfrastructureMongoCollectionsPageDocument"
-                  }
+                  "$ref": "#/components/schemas/MangaScrapperFeaturesRecurringJobsCreateOrUpdateResponse"
                 }
               }
             }
+          },
+          "401": {
+            "description": "Unauthorized"
           }
-        }
+        },
+        "security": [
+          {
+            "JWTBearerAuth": []
+          }
+        ]
       }
     },
-    "/api/scrapper/kiryuu/manga/{mangaId}": {
-      "get": {
+    "/api/recurring-jobs/{jobId}": {
+      "delete": {
         "tags": [
-          "Scrapper"
+          "Recurring-Jobs"
         ],
-        "operationId": "MangaScrapperFeaturesScrapperKiryuuGetAllChaptersEndpoint",
+        "operationId": "MangaScrapperFeaturesRecurringJobsDeleteEndpoint",
         "parameters": [
           {
-            "name": "mangaId",
+            "name": "jobId",
             "in": "path",
             "required": true,
             "schema": {
-              "type": "integer",
-              "format": "int32"
+              "type": "string"
             }
           }
         ],
@@ -609,15 +1054,20 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/MangaScrapperInfrastructureMongoCollectionsChapterDocument"
-                  }
+                  "$ref": "#/components/schemas/MangaScrapperFeaturesRecurringJobsDeleteResponse"
                 }
               }
             }
+          },
+          "401": {
+            "description": "Unauthorized"
           }
-        }
+        },
+        "security": [
+          {
+            "JWTBearerAuth": []
+          }
+        ]
       }
     },
     "/api/manga/{id}": {
@@ -660,8 +1110,16 @@
                 }
               }
             }
+          },
+          "401": {
+            "description": "Unauthorized"
           }
-        }
+        },
+        "security": [
+          {
+            "JWTBearerAuth": []
+          }
+        ]
       }
     },
     "/api/manga/qdrant/sync": {
@@ -703,6 +1161,83 @@
             "JWTBearerAuth": []
           }
         ]
+      }
+    },
+    "/api/manga/trending": {
+      "get": {
+        "tags": [
+          "Manga"
+        ],
+        "operationId": "MangaScrapperFeaturesMangaGetTrendingEndpoint",
+        "parameters": [
+          {
+            "name": "search",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "nullable": true
+            }
+          },
+          {
+            "name": "genres",
+            "in": "query",
+            "style": "form",
+            "explode": true,
+            "schema": {
+              "type": "array",
+              "nullable": true,
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "nullable": true
+            }
+          },
+          {
+            "name": "type",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "nullable": true
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "pageSize",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MangaScrapperFeaturesMangaGetTrendingResponse"
+                }
+              }
+            }
+          }
+        }
       }
     },
     "/api/manga/recommendations": {
@@ -1087,6 +1622,29 @@
         }
       }
     },
+    "/api/images/proxy": {
+      "get": {
+        "tags": [
+          "Images"
+        ],
+        "operationId": "MangaScrapperFeaturesImagesProxyEndpoint",
+        "parameters": [
+          {
+            "name": "url",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          }
+        }
+      }
+    },
     "/api/dashboard/storage/sync": {
       "post": {
         "tags": [
@@ -1320,6 +1878,53 @@
           "lastReadAt": {
             "type": "string",
             "format": "date-time"
+          },
+          "chapterLogs": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MangaScrapperInfrastructureMongoCollectionsUserChapterLogDocument"
+            }
+          },
+          "totalReadingTime": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
+      "MangaScrapperInfrastructureMongoCollectionsUserChapterLogDocument": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "guid"
+          },
+          "chapterId": {
+            "type": "string",
+            "format": "guid"
+          },
+          "chapterNumber": {
+            "type": "number",
+            "format": "double"
+          },
+          "lastReadPage": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "totalPages": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "isCompleted": {
+            "type": "boolean"
+          },
+          "readingTimeSeconds": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "lastReadAt": {
+            "type": "string",
+            "format": "date-time"
           }
         }
       },
@@ -1433,6 +2038,211 @@
         "type": "object",
         "additionalProperties": false
       },
+      "MangaScrapperSharedModelsJikanMangaItem": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "mal_id": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "url": {
+            "type": "string",
+            "nullable": true
+          },
+          "title": {
+            "type": "string",
+            "nullable": true
+          },
+          "title_english": {
+            "type": "string",
+            "nullable": true
+          },
+          "title_japanese": {
+            "type": "string",
+            "nullable": true
+          },
+          "title_synonyms": {
+            "type": "array",
+            "nullable": true,
+            "items": {
+              "type": "string"
+            }
+          },
+          "type": {
+            "type": "string",
+            "nullable": true
+          },
+          "chapters": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "volumes": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "status": {
+            "type": "string",
+            "nullable": true
+          },
+          "score": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "synopsis": {
+            "type": "string",
+            "nullable": true
+          },
+          "images": {
+            "nullable": true,
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/MangaScrapperSharedModelsJikanImages"
+              }
+            ]
+          },
+          "authors": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MangaScrapperSharedModelsJikanAuthor"
+            }
+          },
+          "genres": {
+            "type": "array",
+            "nullable": true,
+            "items": {
+              "$ref": "#/components/schemas/MangaScrapperSharedModelsJikanGenre"
+            }
+          },
+          "published": {
+            "nullable": true,
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/MangaScrapperSharedModelsJikanPublished"
+              }
+            ]
+          },
+          "popularity": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "members": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
+      "MangaScrapperSharedModelsJikanImages": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "jpg": {
+            "nullable": true,
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/MangaScrapperSharedModelsJikanImageDetail"
+              }
+            ]
+          },
+          "webp": {
+            "nullable": true,
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/MangaScrapperSharedModelsJikanImageDetail"
+              }
+            ]
+          }
+        }
+      },
+      "MangaScrapperSharedModelsJikanImageDetail": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "image_url": {
+            "type": "string",
+            "nullable": true
+          },
+          "small_image_url": {
+            "type": "string",
+            "nullable": true
+          },
+          "large_image_url": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
+      "MangaScrapperSharedModelsJikanAuthor": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "mal_id": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "type": {
+            "type": "string",
+            "nullable": true
+          },
+          "name": {
+            "type": "string",
+            "nullable": true
+          },
+          "url": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
+      "MangaScrapperSharedModelsJikanGenre": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "mal_id": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "type": {
+            "type": "string",
+            "nullable": true
+          },
+          "name": {
+            "type": "string",
+            "nullable": true
+          },
+          "url": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
+      "MangaScrapperSharedModelsJikanPublished": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "from": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "to": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "string": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
+      "MangaScrapperFeaturesScrapperSearchJikanRequest": {
+        "type": "object",
+        "additionalProperties": false
+      },
       "MangaScrapperFeaturesScrapperScrapChapterPagesRequest": {
         "type": "object",
         "additionalProperties": false
@@ -1498,6 +2308,15 @@
           "latestScrapped": {
             "type": "string",
             "format": "date-time",
+            "nullable": true
+          },
+          "currentChapterNumber": {
+            "type": "number",
+            "format": "double"
+          },
+          "mangaId": {
+            "type": "string",
+            "format": "guid",
             "nullable": true
           }
         }
@@ -1620,6 +2439,9 @@
             "type": "string",
             "nullable": true
           },
+          "language": {
+            "type": "string"
+          },
           "totalView": {
             "type": "integer",
             "format": "int32"
@@ -1657,6 +2479,26 @@
           }
         }
       },
+      "MangaScrapperFeaturesScrapperMangadexScrapRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "mangaUrl": {
+            "type": "string"
+          },
+          "scrapChapterPages": {
+            "type": "boolean"
+          },
+          "linkId": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
+      "MangaScrapperInfrastructureModelsDetailRequest": {
+        "type": "object",
+        "additionalProperties": false
+      },
       "MangaScrapperFeaturesScrapperKomikuScrapMangaRequest": {
         "type": "object",
         "additionalProperties": false,
@@ -1666,6 +2508,26 @@
           },
           "scrapChapterPages": {
             "type": "boolean"
+          },
+          "linkId": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
+      "MangaScrapperFeaturesScrapperKomikcastScrapRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "mangaUrl": {
+            "type": "string"
+          },
+          "scrapChapterPages": {
+            "type": "boolean"
+          },
+          "linkId": {
+            "type": "string",
+            "nullable": true
           }
         }
       },
@@ -1678,21 +2540,99 @@
           },
           "scrapChapterPages": {
             "type": "boolean"
+          },
+          "linkId": {
+            "type": "string",
+            "nullable": true
           }
         }
       },
-      "MangaScrapperFeaturesScrapperKiryuuGetSingleChapterPagesRequest": {
+      "MangaScrapperFeaturesRecurringJobsTriggerResponse": {
         "type": "object",
         "additionalProperties": false,
         "properties": {
-          "chapterUrl": {
+          "message": {
             "type": "string"
           }
         }
       },
-      "MangaScrapperFeaturesScrapperKiryuuGetAllChaptersRequest": {
+      "MangaScrapperFeaturesRecurringJobsTriggerRequest": {
         "type": "object",
         "additionalProperties": false
+      },
+      "MangaScrapperFeaturesRecurringJobsGetRecurringJobDto": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "cron": {
+            "type": "string"
+          },
+          "queue": {
+            "type": "string"
+          },
+          "nextExecution": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "lastExecution": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "lastJobState": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          }
+        }
+      },
+      "MangaScrapperFeaturesRecurringJobsDeleteResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "message": {
+            "type": "string"
+          }
+        }
+      },
+      "MangaScrapperFeaturesRecurringJobsDeleteRequest": {
+        "type": "object",
+        "additionalProperties": false
+      },
+      "MangaScrapperFeaturesRecurringJobsCreateOrUpdateResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "message": {
+            "type": "string"
+          }
+        }
+      },
+      "MangaScrapperFeaturesRecurringJobsCreateOrUpdateRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "jobId": {
+            "type": "string"
+          },
+          "cronExpression": {
+            "type": "string"
+          },
+          "provider": {
+            "type": "string"
+          },
+          "scrapLastTotalPage": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
       },
       "MangaScrapperFeaturesMangaUpdateMangaResponse": {
         "type": "object",
@@ -1748,6 +2688,14 @@
           "totalView": {
             "type": "integer",
             "format": "int32"
+          },
+          "popularity": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "members": {
+            "type": "integer",
+            "format": "int32"
           }
         }
       },
@@ -1759,6 +2707,150 @@
             "type": "string"
           }
         }
+      },
+      "MangaScrapperFeaturesMangaGetTrendingResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MangaScrapperFeaturesMangaGetTrendingMangaSummary"
+            }
+          },
+          "totalCount": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "page": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "pageSize": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
+      "MangaScrapperFeaturesMangaGetTrendingMangaSummary": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "guid"
+          },
+          "malId": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "title": {
+            "type": "string"
+          },
+          "author": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string"
+          },
+          "genres": {
+            "type": "array",
+            "nullable": true,
+            "items": {
+              "type": "string"
+            }
+          },
+          "description": {
+            "type": "string",
+            "nullable": true
+          },
+          "imageUrl": {
+            "type": "string",
+            "nullable": true
+          },
+          "localImageUrl": {
+            "type": "string",
+            "nullable": true
+          },
+          "rating": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "popularity": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "members": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "releaseDate": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "status": {
+            "type": "string",
+            "nullable": true
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "url": {
+            "type": "string",
+            "nullable": true
+          },
+          "totalView": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "latestChapter": {
+            "$ref": "#/components/schemas/MangaScrapperFeaturesMangaGetTrendingLatestChapterSummary"
+          }
+        }
+      },
+      "MangaScrapperFeaturesMangaGetTrendingLatestChapterSummary": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "guid"
+          },
+          "number": {
+            "type": "number",
+            "format": "double"
+          },
+          "totalView": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "chapterProvider": {
+            "type": "string",
+            "nullable": true
+          },
+          "chapterProviderIcon": {
+            "type": "string",
+            "nullable": true
+          },
+          "language": {
+            "type": "string"
+          },
+          "uploadDate": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "MangaScrapperFeaturesMangaGetTrendingRequest": {
+        "type": "object",
+        "additionalProperties": false
       },
       "MangaScrapperFeaturesMangaGetRecommendationsResponse": {
         "type": "object",
@@ -1879,6 +2971,9 @@
             "type": "string",
             "nullable": true
           },
+          "language": {
+            "type": "string"
+          },
           "uploadDate": {
             "type": "string",
             "format": "date-time"
@@ -1970,6 +3065,10 @@
             "type": "string",
             "nullable": true
           },
+          "thumbnailSize": {
+            "type": "integer",
+            "format": "int64"
+          },
           "rating": {
             "type": "number",
             "format": "double",
@@ -2046,6 +3145,9 @@
             "type": "string",
             "nullable": true
           },
+          "language": {
+            "type": "string"
+          },
           "pageCount": {
             "type": "integer",
             "format": "int32"
@@ -2068,6 +3170,10 @@
         "additionalProperties": false
       },
       "MangaScrapperFeaturesImagesRequest": {
+        "type": "object",
+        "additionalProperties": false
+      },
+      "MangaScrapperFeaturesImagesProxyRequest": {
         "type": "object",
         "additionalProperties": false
       },

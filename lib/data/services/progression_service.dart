@@ -24,13 +24,15 @@ class ProgressionService {
   static const _progressionKey = 'manga_progression';
 
   Future<void> saveProgression(MangaProgression progression) async {
-    // 1. Update local cache
-    await _updateLocalCache(progression);
+    // 1. Update local cache (merge)
+    await _updateLocalCache(progression, overwrite: false);
 
     // 2. Try API
     final apiService = getIt<MangaApiService>();
     try {
-      await apiService.updateUserProgression(progression.toApiRequest());
+      final response = await apiService.updateUserProgression(progression.toApiRequest());
+      final updatedProgression = MangaProgression.fromMap(response);
+      await _updateLocalCache(updatedProgression, overwrite: true);
     } catch (e) {
       // 3. Queue for sync if failed
       getIt<SyncService>().enqueueAction(
@@ -58,7 +60,7 @@ class ProgressionService {
       final data = await apiService.getProgressionForManga(mangaId);
       if (data != null) {
         final progression = MangaProgression.fromMap(data);
-        await _updateLocalCache(progression);
+        await _updateLocalCache(progression, overwrite: true);
       }
     } catch (_) {
       // Silently ignore — caller already has local data
@@ -104,14 +106,36 @@ class ProgressionService {
 
   // Helper methods for local cache
 
-  Future<void> _updateLocalCache(MangaProgression progression) async {
+  Future<void> _updateLocalCache(MangaProgression progression, {bool overwrite = false}) async {
     final progressions = await _loadFromLocalCache();
     final index = progressions.indexWhere(
       (p) => p.mangaId == progression.mangaId,
     );
 
     if (index >= 0) {
-      progressions[index] = progression;
+      if (overwrite) {
+        progressions[index] = progression;
+      } else {
+        final existing = progressions[index];
+        final updatedLogs = List<UserChapterLog>.from(existing.chapterLogs);
+        
+        for (final newLog in progression.chapterLogs) {
+          final logIndex = updatedLogs.indexWhere((l) => l.chapterId == newLog.chapterId);
+          if (logIndex >= 0) {
+            updatedLogs[logIndex] = newLog;
+          } else {
+            updatedLogs.add(newLog);
+          }
+        }
+        
+        final totalReadingTime = updatedLogs.fold<int>(0, (sum, log) => sum + log.readingTimeSeconds);
+
+        progressions[index] = existing.copyWith(
+          chapterLogs: updatedLogs,
+          totalReadingTime: totalReadingTime,
+          lastReadAt: progression.lastReadAt,
+        );
+      }
     } else {
       progressions.add(progression);
     }

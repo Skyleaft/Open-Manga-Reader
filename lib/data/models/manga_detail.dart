@@ -129,6 +129,7 @@ class Chapter {
   final String? chapterProvider;
   final String? chapterProviderIcon;
   final String? link;
+  final String language;
   final int totalView;
 
   Chapter({
@@ -142,6 +143,7 @@ class Chapter {
     this.chapterProvider,
     this.chapterProviderIcon,
     this.link,
+    this.language = '',
     this.totalView = 0,
   });
 
@@ -163,6 +165,7 @@ class Chapter {
       chapterProvider: map['chapterProvider'] as String?,
       chapterProviderIcon: map['chapterProviderIcon'] as String?,
       link: map['link'] as String?,
+      language: map['language'] as String? ?? '',
       totalView: map['totalView'] as int? ?? 0,
     );
   }
@@ -179,6 +182,7 @@ class Chapter {
       'chapterProvider': chapterProvider,
       'chapterProviderIcon': chapterProviderIcon,
       'link': link,
+      'language': language,
       'totalView': totalView,
     };
   }
