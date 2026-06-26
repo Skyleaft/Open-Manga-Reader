@@ -52,8 +52,8 @@ class _ReaderScreenState extends State<ReaderScreen>
   int _currentPage = 1;
   TapDownDetails? _doubleTapDetails;
 
-  // Reading time tracking
-  int _initialReadingTimeSeconds = 0;
+  // Reading time tracking — per-chapter reading time at the start of the session
+  int _chapterInitialReadingTimeSeconds = 0;
   late DateTime _sessionStartTime;
 
   bool _isWebtoonMode = true;
@@ -106,14 +106,25 @@ class _ReaderScreenState extends State<ReaderScreen>
     _loadInitialReadingTime();
   }
 
-  Future<void> _loadInitialReadingTime() async {
+  Future<void> _loadInitialReadingTime({String? chapterId}) async {
+    final targetChapterId = chapterId ?? _chapterId;
     try {
       final progression = await _progressionService.getProgression(
         widget.content.mangaId,
       );
       if (progression != null && mounted) {
+        // Find this chapter's existing reading time (if any)
+        final chapterLog = progression.chapterLogs
+            .where((l) => l.chapterId == targetChapterId)
+            .fold<UserChapterLog?>(
+              null,
+              (prev, l) => prev == null || l.lastReadAt.isAfter(prev.lastReadAt)
+                  ? l
+                  : prev,
+            );
         setState(() {
-          _initialReadingTimeSeconds = progression.readingTimeSeconds;
+          _chapterInitialReadingTimeSeconds =
+              chapterLog?.readingTimeSeconds ?? 0;
         });
       }
     } catch (e) {
@@ -226,12 +237,12 @@ class _ReaderScreenState extends State<ReaderScreen>
       // Clear live images to allow eviction of previous chapter images
       PaintingBinding.instance.imageCache.clearLiveImages();
 
-      // Update total reading time before switching
-      final sessionSeconds = DateTime.now()
-          .difference(_sessionStartTime)
-          .inSeconds;
-      _initialReadingTimeSeconds += sessionSeconds;
+      // Save progression for the chapter we are leaving before switching
+      await _saveProgression();
+
+      // Reset reading time tracking for the new chapter
       _sessionStartTime = DateTime.now();
+      _chapterInitialReadingTimeSeconds = 0;
 
       setState(() {
         _pageUrls = pages
@@ -258,6 +269,9 @@ class _ReaderScreenState extends State<ReaderScreen>
           _pageController.jumpToPage(0);
         }
       });
+
+      // Load new chapter's previously saved reading time in background
+      _loadInitialReadingTime(chapterId: targetChapter.id);
     } catch (e) {
       setState(() => _isLoading = false);
       if (mounted) {
@@ -864,10 +878,12 @@ class _ReaderScreenState extends State<ReaderScreen>
   Future<void> _saveProgression() async {
     final isCompleted = _progress >= 0.99;
 
+    // Per-chapter reading time: time already stored for this chapter + this session
     final sessionSeconds = DateTime.now()
         .difference(_sessionStartTime)
         .inSeconds;
-    final totalReadingTime = _initialReadingTimeSeconds + sessionSeconds;
+    final chapterReadingTime =
+        _chapterInitialReadingTimeSeconds + sessionSeconds;
 
     final progression = MangaProgression(
       mangaId: widget.content.mangaId,
@@ -877,13 +893,12 @@ class _ReaderScreenState extends State<ReaderScreen>
       totalPages: _pageUrls.length,
       lastRead: DateTime.now(),
       isCompleted: isCompleted,
-      readingTimeSeconds: totalReadingTime,
+      readingTimeSeconds: chapterReadingTime,
     );
 
     try {
       await _progressionService.saveProgression(progression);
     } catch (e) {
-      // Show error message to help debug the issue
       if (mounted) {
         AlertBanner.show(
           context,
@@ -891,7 +906,6 @@ class _ReaderScreenState extends State<ReaderScreen>
           type: AlertBannerType.error,
         );
       }
-      // Log the error for debugging
       debugPrint('Progression save error: $e');
     }
   }
