@@ -65,7 +65,7 @@ class _MoreScreenState extends State<MoreScreen> {
                 'title': libManga.title,
                 'author': libManga.author,
                 'imageUrl': libManga.imageUrl,
-                'localImageUrl': null,
+                'localImageUrl': libManga.imageUrl,
               };
             } else {
               final detailJson = await _apiService.getMangaDetail(mangaId);
@@ -401,78 +401,76 @@ class _MoreScreenState extends State<MoreScreen> {
             ),
             child: _progressions.isEmpty
                 ? const Center(child: Text('No reading stats available.'))
-                : ListView.separated(
-                    shrinkWrap: true,
-                    itemCount: _progressions.length,
-                    separatorBuilder: (context, index) => const Divider(),
-                    itemBuilder: (context, index) {
-                      final p = _progressions[index];
-                      final mangaInfo = _mangaDetailsMap[p.mangaId];
-                      final title =
-                          mangaInfo?['title'] ?? 'Manga ID: ${p.mangaId}';
-                      final author = mangaInfo?['author'] ?? 'Unknown Author';
-                      final imageUrl = mangaInfo?['imageUrl'] ?? '';
-                      final localImageUrl = mangaInfo?['localImageUrl'];
+                : () {
+                    // Sort by lastReadAt descending (most recent first)
+                    final sorted = List<MangaProgression>.from(_progressions)
+                      ..sort((a, b) => b.lastReadAt.compareTo(a.lastReadAt));
+                    return ListView.separated(
+                      shrinkWrap: true,
+                      itemCount: sorted.length,
+                      separatorBuilder: (context, index) => const Divider(),
+                      itemBuilder: (context, index) {
+                        final p = sorted[index];
+                        final mangaInfo = _mangaDetailsMap[p.mangaId];
+                        final title =
+                            mangaInfo?['title'] ?? 'Manga ID: ${p.mangaId}';
+                        final author = mangaInfo?['author'] ?? 'Unknown Author';
+                        final imageUrl = mangaInfo?['imageUrl'] ?? '';
+                        final localImageUrl = mangaInfo?['localImageUrl'];
 
-                      int chaptersCompleted = p.chapterLogs
-                          .where((l) => l.isCompleted)
-                          .length;
+                        int chaptersCompleted = p.chapterLogs
+                            .where((l) => l.isCompleted)
+                            .length;
 
-                      return ListTile(
-                        leading: imageUrl.isNotEmpty
-                            ? ClipRRect(
-                                borderRadius: BorderRadius.circular(4),
-                                child: Image.network(
-                                  _apiService.getLocalImageUrl(
-                                    localImageUrl,
-                                    imageUrl,
-                                  ),
-                                  width: 40,
-                                  height: 55,
-                                  fit: BoxFit.cover,
-                                  errorBuilder: (_, _, _) => Container(
-                                    width: 40,
-                                    height: 55,
-                                    color: Colors.grey,
-                                    child: const Icon(
-                                      Icons.broken_image,
-                                      size: 16,
-                                    ),
-                                  ),
-                                ),
-                              )
-                            : Container(
+                        return ListTile(
+                          leading: ClipRRect(
+                            borderRadius: BorderRadius.circular(4),
+                            child: Image.network(
+                              _apiService.getLocalImageUrl(
+                                localImageUrl,
+                                imageUrl,
+                              ),
+                              width: 40,
+                              height: 55,
+                              fit: BoxFit.cover,
+                              errorBuilder: (_, _, _) => Container(
                                 width: 40,
                                 height: 55,
                                 color: Colors.grey,
-                                child: const Icon(Icons.book, size: 16),
-                              ),
-                        title: Text(
-                          title,
-                          style: const TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.bold,
-                          ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                        subtitle: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(author, style: const TextStyle(fontSize: 12)),
-                            const SizedBox(height: 2),
-                            Text(
-                              'Chapters completed: $chaptersCompleted',
-                              style: const TextStyle(
-                                fontSize: 11,
-                                color: Colors.grey,
+                                child: const Icon(Icons.broken_image, size: 16),
                               ),
                             ),
-                          ],
-                        ),
-                      );
-                    },
-                  ),
+                          ),
+                          title: Text(
+                            title,
+                            style: const TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.bold,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          subtitle: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                author,
+                                style: const TextStyle(fontSize: 12),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                'Chapters completed: $chaptersCompleted',
+                                style: const TextStyle(
+                                  fontSize: 11,
+                                  color: Colors.grey,
+                                ),
+                              ),
+                            ],
+                          ),
+                        );
+                      },
+                    );
+                  }(),
           ),
           actions: [
             TextButton(
@@ -534,33 +532,42 @@ class _MoreScreenState extends State<MoreScreen> {
                 Expanded(
                   child: _progressions.isEmpty
                       ? const Center(child: Text('No time tracking data.'))
-                      : ListView.separated(
-                          shrinkWrap: true,
-                          itemCount: _progressions.length,
-                          separatorBuilder: (context, index) => const Divider(),
-                          itemBuilder: (context, index) {
-                            final p = _progressions[index];
-                            final mangaInfo = _mangaDetailsMap[p.mangaId];
-                            final title =
-                                mangaInfo?['title'] ?? 'Manga ID: ${p.mangaId}';
+                      : () {
+                          // Sort by lastReadAt descending (most recent first)
+                          final sorted =
+                              List<MangaProgression>.from(_progressions)..sort(
+                                (a, b) => b.lastReadAt.compareTo(a.lastReadAt),
+                              );
+                          return ListView.separated(
+                            shrinkWrap: true,
+                            itemCount: sorted.length,
+                            separatorBuilder: (context, index) =>
+                                const Divider(),
+                            itemBuilder: (context, index) {
+                              final p = sorted[index];
+                              final mangaInfo = _mangaDetailsMap[p.mangaId];
+                              final title =
+                                  mangaInfo?['title'] ??
+                                  'Manga ID: ${p.mangaId}';
 
-                            return ListTile(
-                              title: Text(
-                                title,
-                                style: const TextStyle(fontSize: 13),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                              trailing: Text(
-                                _formatReadingTime(p.totalReadingTime),
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 13,
+                              return ListTile(
+                                title: Text(
+                                  title,
+                                  style: const TextStyle(fontSize: 13),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
                                 ),
-                              ),
-                            );
-                          },
-                        ),
+                                trailing: Text(
+                                  _formatReadingTime(p.totalReadingTime),
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 13,
+                                  ),
+                                ),
+                              );
+                            },
+                          );
+                        }(),
                 ),
               ],
             ),
