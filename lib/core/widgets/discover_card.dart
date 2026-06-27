@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import '../constants/app_colors.dart';
-import '../utils/formatters.dart';
 import '../../data/models/manga_summary.dart';
 import '../../data/services/manga_api_service.dart';
 import '../di/injection.dart';

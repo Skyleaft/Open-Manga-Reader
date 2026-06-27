@@ -6,7 +6,9 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:my_manga_reader/core/di/injection.dart';
 import 'package:my_manga_reader/data/services/google_desktop_auth.dart';
+import 'package:my_manga_reader/data/services/library_service.dart';
 import 'package:my_manga_reader/data/services/manga_api_service.dart';
+import 'package:my_manga_reader/data/services/progression_service.dart';
 
 class AuthService {
   final FirebaseAuth _auth = FirebaseAuth.instance;
@@ -24,8 +26,7 @@ class AuthService {
   /// Returns `true` when running on a desktop OS (Windows / Linux / macOS)
   /// but NOT on the web.
   static bool get _isDesktop =>
-      !kIsWeb &&
-      (Platform.isWindows || Platform.isLinux || Platform.isMacOS);
+      !kIsWeb && (Platform.isWindows || Platform.isLinux || Platform.isMacOS);
 
   Future<User?> signInWithGoogle() async {
     try {
@@ -38,6 +39,12 @@ class AuthService {
         if (idToken != null) {
           await getIt<MangaApiService>().loginWithFirebase(idToken);
         }
+
+        // Load user data from API to populate local cache
+        await Future.wait([
+          getIt<ProgressionService>().refreshFromApi(),
+          getIt<LibraryService>().refreshFromApi(),
+        ]);
 
         return userCredential.user;
       }
@@ -58,6 +65,12 @@ class AuthService {
         if (idToken != null) {
           await getIt<MangaApiService>().loginWithFirebase(idToken);
         }
+
+        // Load user data from API to populate local cache
+        await Future.wait([
+          getIt<ProgressionService>().refreshFromApi(),
+          getIt<LibraryService>().refreshFromApi(),
+        ]);
 
         return userCredential.user;
       }
@@ -81,6 +94,12 @@ class AuthService {
         await getIt<MangaApiService>().loginWithFirebase(idToken);
       }
 
+      // Load user data from API to populate local cache
+      await Future.wait([
+        getIt<ProgressionService>().refreshFromApi(),
+        getIt<LibraryService>().refreshFromApi(),
+      ]);
+
       return userCredential.user;
     } on FirebaseAuthException catch (e) {
       debugPrint('Firebase error: ${e.code}');
@@ -98,6 +117,12 @@ class AuthService {
 
     // Clear backend JWT token
     await getIt<MangaApiService>().logout();
+
+    // Clear local data store
+    await Future.wait([
+      getIt<ProgressionService>().clearAllProgressions(),
+      getIt<LibraryService>().clearLibrary(),
+    ]);
 
     await _auth.signOut();
   }

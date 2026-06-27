@@ -1,10 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:my_manga_reader/core/constants/app_colors.dart';
 import 'package:my_manga_reader/core/widgets/alert_banner.dart';
 import 'package:my_manga_reader/core/di/injection.dart';
 import 'package:my_manga_reader/data/services/manga_api_service.dart';
-import 'package:my_manga_reader/routes/app_pages.dart';
 import 'package:my_manga_reader/data/models/search_result.dart';
 import 'package:my_manga_reader/data/models/manga_detail.dart';
 import 'package:my_manga_reader/data/models/manga_summary.dart';

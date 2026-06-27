@@ -16,7 +16,7 @@ void main() async {
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
 
   // Preload Google Fonts to prevent debug pauses
-  await GoogleFonts.pendingFonts;
+  GoogleFonts.pendingFonts;
 
   // Initialize app configuration
   await AppConfig.init();

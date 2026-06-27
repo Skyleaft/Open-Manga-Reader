@@ -7,6 +7,7 @@ import '../../../../data/services/auth_service.dart';
 import 'base_api_setting_screen.dart';
 import 'package:my_manga_reader/data/services/progression_service.dart';
 import 'package:my_manga_reader/data/services/manga_api_service.dart';
+import 'package:my_manga_reader/data/services/library_service.dart';
 import 'package:my_manga_reader/data/models/progression.dart';
 import 'package:my_manga_reader/data/models/library_manga.dart';
 import 'package:my_manga_reader/core/di/injection.dart';
@@ -429,7 +430,7 @@ class _MoreScreenState extends State<MoreScreen> {
                                   width: 40,
                                   height: 55,
                                   fit: BoxFit.cover,
-                                  errorBuilder: (_, __, ___) => Container(
+                                  errorBuilder: (_, _, _) => Container(
                                     width: 40,
                                     height: 55,
                                     color: Colors.grey,

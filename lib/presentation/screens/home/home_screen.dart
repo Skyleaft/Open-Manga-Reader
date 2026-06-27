@@ -519,10 +519,10 @@ class _HomeScreenState extends State<HomeScreen>
                   ? CachedNetworkImage(
                       imageUrl: imageUrl,
                       fit: BoxFit.cover,
-                      placeholder: (_, __) => Container(
+                      placeholder: (_, _) => Container(
                         color: isDark ? Colors.grey[800] : Colors.grey[200],
                       ),
-                      errorBuilder: (_, __, ___) => Container(
+                      errorBuilder: (_, _, _) => Container(
                         color: isDark ? Colors.grey[800] : Colors.grey[200],
                         child: const Icon(
                           Icons.image_not_supported,
@@ -908,12 +908,12 @@ class _HomeScreenState extends State<HomeScreen>
                         ? CachedNetworkImage(
                             imageUrl: imageUrl,
                             fit: BoxFit.cover,
-                            placeholder: (_, __) => Container(
+                            placeholder: (_, _) => Container(
                               color: isDark
                                   ? Colors.grey[850]
                                   : Colors.grey[200],
                             ),
-                            errorBuilder: (_, __, ___) => Container(
+                            errorBuilder: (_, _, _) => Container(
                               color: isDark
                                   ? Colors.grey[850]
                                   : Colors.grey[200],

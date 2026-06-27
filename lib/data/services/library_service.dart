@@ -98,6 +98,14 @@ class LibraryService {
     }
   }
 
+  /// Fetches all library data from the API and updates local cache.
+  /// Public wrapper — call and await this to ensure data is refreshed from the server.
+  Future<void> refreshFromApi() async {
+    final apiService = getIt<MangaApiService>();
+    final syncService = getIt<SyncService>();
+    await _syncLibraryFromApi(apiService, syncService);
+  }
+
   Future<bool> isInLibrary(String mangaId) async {
     final library = await getAllLibraryMangas();
     return library.any((m) => m.id == mangaId);

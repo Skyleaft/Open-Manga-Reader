@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/di/injection.dart';
-import '../../../core/widgets/manga_card.dart';
 import 'package:cached_network_image_ce/cached_network_image.dart';
 import '../../../data/models/manga_detail.dart';
 import '../../../data/models/progression.dart';

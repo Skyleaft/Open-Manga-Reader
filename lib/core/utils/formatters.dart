@@ -1,5 +1,3 @@
-import 'package:flutter/material.dart';
-
 /// Global function to format view counts in a readable format
 /// - 1000+ views: "X.Xk" format (e.g., "72.3k")
 /// - 1000000+ views: "X.XXm" format (e.g., "1.23m")

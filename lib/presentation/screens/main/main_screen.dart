@@ -201,7 +201,7 @@ class _MainScreenState extends State<MainScreen> with TickerProviderStateMixin {
               right: 0,
               bottom: 0,
               child: Center(
-                child: Container(
+                child: SizedBox(
                   width: 600, // Fixed width for desktop
                   child: AppBottomNav(
                     currentIndex: _currentIndex,

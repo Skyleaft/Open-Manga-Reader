@@ -290,7 +290,9 @@ class SearchScrapCard extends StatelessWidget {
                             ),
                           ),
                           ElevatedButton(
-                            onPressed: item.detailUrl.isNotEmpty ? onScrap : null,
+                            onPressed: item.detailUrl.isNotEmpty
+                                ? onScrap
+                                : null,
                             style: ElevatedButton.styleFrom(
                               backgroundColor: AppColors.primary,
                               foregroundColor: Colors.white,
@@ -336,7 +338,7 @@ class SearchScrapCard extends StatelessWidget {
             ? Image.network(
                 item.thumbnail,
                 fit: BoxFit.cover,
-                errorBuilder: (_, __, ___) => _buildPlaceholder(),
+                errorBuilder: (_, _, _) => _buildPlaceholder(),
               )
             : _buildPlaceholder(),
       ),

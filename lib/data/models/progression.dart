@@ -77,22 +77,23 @@ class MangaProgression {
     int? totalPages,
     bool? isCompleted,
     int? readingTimeSeconds,
-  })  : this.lastReadAt = lastReadAt ?? lastRead ?? DateTime.now(),
-        this.chapterLogs = chapterLogs ??
-            (chapterId != null && chapterId.isNotEmpty
-                ? [
-                    UserChapterLog(
-                      id: '',
-                      chapterId: chapterId,
-                      chapterNumber: currentChapter ?? 0.0,
-                      lastReadPage: currentPage ?? 0,
-                      totalPages: totalPages ?? 0,
-                      isCompleted: isCompleted ?? false,
-                      readingTimeSeconds: readingTimeSeconds ?? 0,
-                      lastReadAt: lastReadAt ?? lastRead ?? DateTime.now(),
-                    )
-                  ]
-                : []);
+  }) : lastReadAt = lastReadAt ?? lastRead ?? DateTime.now(),
+       chapterLogs =
+           chapterLogs ??
+           (chapterId != null && chapterId.isNotEmpty
+               ? [
+                   UserChapterLog(
+                     id: '',
+                     chapterId: chapterId,
+                     chapterNumber: currentChapter ?? 0.0,
+                     lastReadPage: currentPage ?? 0,
+                     totalPages: totalPages ?? 0,
+                     isCompleted: isCompleted ?? false,
+                     readingTimeSeconds: readingTimeSeconds ?? 0,
+                     lastReadAt: lastReadAt ?? lastRead ?? DateTime.now(),
+                   ),
+                 ]
+               : []);
 
   UserChapterLog? get _latestLog {
     if (chapterLogs.isEmpty) return null;
@@ -113,29 +114,37 @@ class MangaProgression {
     final rawLogs = map['chapterLogs'] as List<dynamic>?;
     final List<UserChapterLog> logs = rawLogs != null
         ? rawLogs
-            .map((e) => UserChapterLog.fromMap(e as Map<String, dynamic>))
-            .toList()
+              .map((e) => UserChapterLog.fromMap(e as Map<String, dynamic>))
+              .toList()
         : [];
 
     // Also support parsing old format fields if chapterLogs is empty
-    if (logs.isEmpty && (map['chapterId'] != null || map['chapterNumber'] != null || map['currentChapter'] != null)) {
+    if (logs.isEmpty &&
+        (map['chapterId'] != null ||
+            map['chapterNumber'] != null ||
+            map['currentChapter'] != null)) {
       final oldChapterId = map['chapterId'] as String? ?? '';
-      final oldChapterNumber = ((map['chapterNumber'] ?? map['currentChapter'] ?? 0.0) as num).toDouble();
-      final oldLastReadPage = (map['lastReadPage'] ?? map['currentPage'] ?? 1) as int;
+      final oldChapterNumber =
+          ((map['chapterNumber'] ?? map['currentChapter'] ?? 0.0) as num)
+              .toDouble();
+      final oldLastReadPage =
+          (map['lastReadPage'] ?? map['currentPage'] ?? 1) as int;
       final oldTotalPages = (map['totalPages'] ?? 1) as int;
       final oldIsCompleted = map['isCompleted'] as bool? ?? false;
       final oldReadingTimeSeconds = (map['readingTimeSeconds'] ?? 0) as int;
       final oldLastReadAt = _parseDate(map['lastReadAt'] ?? map['lastRead']);
-      logs.add(UserChapterLog(
-        id: '',
-        chapterId: oldChapterId,
-        chapterNumber: oldChapterNumber,
-        lastReadPage: oldLastReadPage,
-        totalPages: oldTotalPages,
-        isCompleted: oldIsCompleted,
-        readingTimeSeconds: oldReadingTimeSeconds,
-        lastReadAt: oldLastReadAt,
-      ));
+      logs.add(
+        UserChapterLog(
+          id: '',
+          chapterId: oldChapterId,
+          chapterNumber: oldChapterNumber,
+          lastReadPage: oldLastReadPage,
+          totalPages: oldTotalPages,
+          isCompleted: oldIsCompleted,
+          readingTimeSeconds: oldReadingTimeSeconds,
+          lastReadAt: oldLastReadAt,
+        ),
+      );
     }
 
     return MangaProgression(

@@ -150,10 +150,10 @@ class MangaApiService {
       final response = await _dio.get(
         '/api/manga/trending',
         queryParameters: {
-          if (search != null) 'search': search,
+          'search': ?search,
           if (genres != null && genres.isNotEmpty) 'genres': genres,
-          if (status != null) 'status': status,
-          if (type != null) 'type': type,
+          'status': ?status,
+          'type': ?type,
           'page': page,
           'pageSize': pageSize,
         },
@@ -292,7 +292,7 @@ class MangaApiService {
         data: {
           'mangaUrl': mangaUrl,
           'scrapChapterPages': scrapChapters,
-          if (linkId != null) 'linkId': linkId,
+          'linkId': ?linkId,
         },
       );
     } catch (e) {

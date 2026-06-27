@@ -4,7 +4,6 @@ import 'package:cached_network_image_ce/cached_network_image.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/widgets/alert_banner.dart';
 import '../../../core/di/injection.dart';
-import '../../../core/widgets/manga_card.dart';
 import '../../../data/models/library_manga.dart';
 import '../../../data/models/manga_detail.dart';
 import '../../../data/services/library_service.dart';
