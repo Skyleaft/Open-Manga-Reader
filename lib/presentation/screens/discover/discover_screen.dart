@@ -157,7 +157,7 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
 
   SliverGridDelegateWithFixedCrossAxisCount _buildGridDelegate() {
     final screenWidth = MediaQuery.of(context).size.width;
-    final isTablet = screenWidth >= 768;
+    final isTablet = screenWidth >= 600;
     final isDesktop = screenWidth >= 1024;
 
     // Responsive grid configuration

@@ -37,7 +37,7 @@ class DiscoverCard extends StatelessWidget {
       imageUrl,
     );
     final screenWidth = MediaQuery.of(context).size.width;
-    final isTablet = screenWidth >= 768;
+    final isTablet = screenWidth >= 600;
     final isDesktop = screenWidth >= 1024;
 
     // Responsive dimensions
