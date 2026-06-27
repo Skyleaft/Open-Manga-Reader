@@ -31,6 +31,9 @@ class _ReaderScreenState extends State<ReaderScreen>
   bool _isLoading = false;
   Timer? _debounceTimer;
   bool _isSliderScrolling = false;
+  bool _isRestoringScroll = false;
+  double _targetProgress = 0.0;
+  double _lastMaxScroll = 0.0;
 
   bool _isAutoScrolling = false;
   double _autoScrollSpeed = 1.0;
@@ -82,17 +85,20 @@ class _ReaderScreenState extends State<ReaderScreen>
     // Set initial scroll position based on saved progress
     if (widget.content.currentPage > 1 &&
         widget.content.currentPage <= _pageUrls.length) {
+      _isRestoringScroll = true;
+      _targetProgress =
+          (widget.content.currentPage - 1) / (_pageUrls.length - 1);
+
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted && _scrollController.hasClients) {
           final maxScroll = _scrollController.position.maxScrollExtent;
-          final targetScroll =
-              ((widget.content.currentPage - 1) / (_pageUrls.length - 1)) *
-              maxScroll;
+          _lastMaxScroll = maxScroll;
+          final targetScroll = _targetProgress * maxScroll;
           _scrollController.jumpTo(targetScroll);
 
           // Update progress and page state to match the scroll position
           setState(() {
-            _progress = (targetScroll / maxScroll).clamp(0.0, 1.0);
+            _progress = _targetProgress;
             _currentPage = widget.content.currentPage;
           });
         }
@@ -161,6 +167,24 @@ class _ReaderScreenState extends State<ReaderScreen>
     final maxScroll = position.maxScrollExtent;
 
     if (maxScroll <= 0) return;
+
+    if (_isRestoringScroll && _isWebtoonMode) {
+      if ((maxScroll - _lastMaxScroll).abs() > 1.0) {
+        _lastMaxScroll = maxScroll;
+        final targetScroll = _targetProgress * maxScroll;
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted && _scrollController.hasClients && _isRestoringScroll) {
+            _scrollController.jumpTo(
+              targetScroll.clamp(
+                0.0,
+                _scrollController.position.maxScrollExtent,
+              ),
+            );
+          }
+        });
+        return;
+      }
+    }
 
     final currentScroll = position.pixels.clamp(0.0, maxScroll);
 
@@ -260,6 +284,7 @@ class _ReaderScreenState extends State<ReaderScreen>
         _progress = 0.0;
         _currentPage = 1;
         _isLoading = false;
+        _isRestoringScroll = false;
         // Reset scroll position
         _transformationController.value = Matrix4.identity();
         if (_scrollController.hasClients) {
@@ -742,19 +767,27 @@ class _ReaderScreenState extends State<ReaderScreen>
         body: Stack(
           children: [
             // Content Area
-            ReaderContentWidget(
-              pageUrls: _pageUrls,
-              isLoading: _isLoading,
-              showUI: _showUI,
-              transformationController: _transformationController,
-              scrollController: _scrollController,
-              pageController: _pageController,
-              isWebtoonMode: _isWebtoonMode,
-              onPageChanged: _onPageChanged,
-              onTap: _toggleUI,
-              onDoubleTapDown: _handleDoubleTapDown,
-              onDoubleTap: _handleDoubleTap,
-              onToggleUI: _toggleUI,
+            NotificationListener<ScrollNotification>(
+              onNotification: (notification) {
+                if (notification is UserScrollNotification) {
+                  _isRestoringScroll = false;
+                }
+                return false;
+              },
+              child: ReaderContentWidget(
+                pageUrls: _pageUrls,
+                isLoading: _isLoading,
+                showUI: _showUI,
+                transformationController: _transformationController,
+                scrollController: _scrollController,
+                pageController: _pageController,
+                isWebtoonMode: _isWebtoonMode,
+                onPageChanged: _onPageChanged,
+                onTap: _toggleUI,
+                onDoubleTapDown: _handleDoubleTapDown,
+                onDoubleTap: _handleDoubleTap,
+                onToggleUI: _toggleUI,
+              ),
             ),
 
             // Top Header
@@ -798,6 +831,7 @@ class _ReaderScreenState extends State<ReaderScreen>
                         });
 
                         if (_scrollController.hasClients) {
+                          _isRestoringScroll = false;
                           final maxScroll =
                               _scrollController.position.maxScrollExtent;
                           final target = value * maxScroll;
@@ -879,11 +913,15 @@ class _ReaderScreenState extends State<ReaderScreen>
     final isCompleted = _progress >= 0.99;
 
     // Per-chapter reading time: time already stored for this chapter + this session
-    final sessionSeconds = DateTime.now()
-        .difference(_sessionStartTime)
-        .inSeconds;
-    final chapterReadingTime =
-        _chapterInitialReadingTimeSeconds + sessionSeconds;
+    final now = DateTime.now();
+    final sessionSeconds = now.difference(_sessionStartTime).inSeconds;
+
+    // Reset session start time to prevent double counting
+    _sessionStartTime = now;
+
+    // We update the local variable for UI state, but the API and ProgressionService
+    // now expect just the delta (time since last save) to accumulate it correctly.
+    _chapterInitialReadingTimeSeconds += sessionSeconds;
 
     final progression = MangaProgression(
       mangaId: widget.content.mangaId,
@@ -891,9 +929,9 @@ class _ReaderScreenState extends State<ReaderScreen>
       currentChapter: _currentChapterNumber,
       currentPage: _currentPage,
       totalPages: _pageUrls.length,
-      lastRead: DateTime.now(),
+      lastRead: now,
       isCompleted: isCompleted,
-      readingTimeSeconds: chapterReadingTime,
+      readingTimeSeconds: sessionSeconds, // Send only the delta
     );
 
     try {

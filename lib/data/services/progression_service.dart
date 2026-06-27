@@ -135,7 +135,17 @@ class ProgressionService {
             (l) => l.chapterId == newLog.chapterId,
           );
           if (logIndex >= 0) {
-            updatedLogs[logIndex] = newLog;
+            final existingLog = updatedLogs[logIndex];
+            updatedLogs[logIndex] = UserChapterLog(
+              id: newLog.id.isEmpty ? existingLog.id : newLog.id,
+              chapterId: newLog.chapterId,
+              chapterNumber: newLog.chapterNumber,
+              lastReadPage: newLog.lastReadPage,
+              totalPages: newLog.totalPages,
+              isCompleted: newLog.isCompleted,
+              readingTimeSeconds: existingLog.readingTimeSeconds + newLog.readingTimeSeconds,
+              lastReadAt: newLog.lastReadAt,
+            );
           } else {
             updatedLogs.add(newLog);
           }
