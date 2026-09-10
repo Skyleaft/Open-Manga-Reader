@@ -71,6 +71,40 @@ class ReaderContent {
     );
   }
 
+  int getChapterIndex(String chapterId, [double? chapterNumber]) {
+    int idx = allChapters.indexWhere((c) => c.id == chapterId);
+    if (idx != -1) return idx;
+    if (chapterNumber != null) {
+      idx = allChapters.indexWhere((c) => c.chapterNumber == chapterNumber);
+      if (idx != -1) return idx;
+    }
+    return -1;
+  }
+
+  Chapter? getNextChapter(String chapterId, [double? chapterNumber]) {
+    final idx = getChapterIndex(chapterId, chapterNumber);
+    if (idx > 0 && idx < allChapters.length) {
+      return allChapters[idx - 1];
+    }
+    return null;
+  }
+
+  Chapter? getPreviousChapter(String chapterId, [double? chapterNumber]) {
+    final idx = getChapterIndex(chapterId, chapterNumber);
+    if (idx >= 0 && idx < allChapters.length - 1) {
+      return allChapters[idx + 1];
+    }
+    return null;
+  }
+
+  bool hasNextChapter(String chapterId, [double? chapterNumber]) {
+    return getNextChapter(chapterId, chapterNumber) != null;
+  }
+
+  bool hasPreviousChapter(String chapterId, [double? chapterNumber]) {
+    return getPreviousChapter(chapterId, chapterNumber) != null;
+  }
+
   factory ReaderContent.fromMap(Map<String, dynamic> map) {
     final rawPages =
         map['pages'] as List<dynamic>? ?? map['pageUrls'] as List<dynamic>?;
