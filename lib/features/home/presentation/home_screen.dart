@@ -179,46 +179,48 @@ class _HomeScreenState extends State<HomeScreen>
     super.build(context);
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
-    return ListenableBuilder(
-      listenable: _controller,
-      builder: (context, _) {
-        return RefreshIndicator(
-          onRefresh: _controller.refresh,
-          color: AppColors.primary,
-          child: SafeArea(
-            child: CustomScrollView(
-              physics: const AlwaysScrollableScrollPhysics(
-                parent: BouncingScrollPhysics(),
-              ),
-              slivers: [
-                SliverAppBar(
-                  floating: true,
-                  snap: true,
-                  backgroundColor: (isDark
-                          ? AppColors.backgroundDark
-                          : AppColors.backgroundLight)
-                      .withValues(alpha: 0.8),
-                  surfaceTintColor: Colors.transparent,
-                  expandedHeight: 80,
-                  toolbarHeight: 0,
-                  flexibleSpace: FlexibleSpaceBar(
-                    background: ClipRRect(
-                      child: BackdropFilter(
-                        filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-                        child: HomeHeader(
-                          isDark: isDark,
-                          onSearchTap: () => _navigateToDiscover(),
-                        ),
+    return RefreshIndicator(
+      onRefresh: _controller.refresh,
+      color: AppColors.primary,
+      child: SafeArea(
+        child: CustomScrollView(
+          physics: const AlwaysScrollableScrollPhysics(
+            parent: BouncingScrollPhysics(),
+          ),
+          slivers: [
+            SliverAppBar(
+              floating: true,
+              snap: true,
+              backgroundColor: (isDark
+                      ? AppColors.backgroundDark
+                      : AppColors.backgroundLight)
+                  .withValues(alpha: 0.8),
+              surfaceTintColor: Colors.transparent,
+              expandedHeight: 80,
+              toolbarHeight: 0,
+              flexibleSpace: FlexibleSpaceBar(
+                background: RepaintBoundary(
+                  child: ClipRRect(
+                    child: BackdropFilter(
+                      filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+                      child: HomeHeader(
+                        isDark: isDark,
+                        onSearchTap: () => _navigateToDiscover(),
                       ),
                     ),
                   ),
                 ),
-                SliverPadding(
-                  padding: const EdgeInsets.only(bottom: 120),
-                  sliver: SliverList(
-                    delegate: SliverChildListDelegate([
-                      const SizedBox(height: 12),
-                      HomeHeroCarousel(
+              ),
+            ),
+            SliverPadding(
+              padding: const EdgeInsets.only(bottom: 120),
+              sliver: SliverList.list(
+                children: [
+                  const SizedBox(height: 12),
+                  RepaintBoundary(
+                    child: ListenableBuilder(
+                      listenable: _controller,
+                      builder: (context, _) => HomeHeroCarousel(
                         mangaList: _controller.heroManga,
                         isLoading: _controller.isLoadingHero,
                         apiService: _apiService,
@@ -229,8 +231,13 @@ class _HomeScreenState extends State<HomeScreen>
                               heroTag: heroTag ?? 'manga-cover-hero-$id',
                             ),
                       ),
-                      const SizedBox(height: 24),
-                      HomeContinueReadingSection(
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+                  RepaintBoundary(
+                    child: ListenableBuilder(
+                      listenable: _controller,
+                      builder: (context, _) => HomeContinueReadingSection(
                         recentProgressions: _controller.recentProgressions,
                         historyDetailsMap: _controller.historyDetailsMap,
                         isLoading: _controller.isLoadingHistory,
@@ -252,8 +259,13 @@ class _HomeScreenState extends State<HomeScreen>
                           }
                         },
                       ),
-                      const SizedBox(height: 28),
-                      HomeTrendingSection(
+                    ),
+                  ),
+                  const SizedBox(height: 28),
+                  RepaintBoundary(
+                    child: ListenableBuilder(
+                      listenable: _controller,
+                      builder: (context, _) => HomeTrendingSection(
                         tabController: _trendingTabController,
                         trendingByTab: _controller.trendingByTab,
                         trendingLoadingByTab: _controller.trendingLoadingByTab,
@@ -268,8 +280,13 @@ class _HomeScreenState extends State<HomeScreen>
                         onNavigateToDiscover: () =>
                             _navigateToDiscover(sortBy: 'totalView'),
                       ),
-                      const SizedBox(height: 28),
-                      HomeLatestUpdatesSection(
+                    ),
+                  ),
+                  const SizedBox(height: 28),
+                  RepaintBoundary(
+                    child: ListenableBuilder(
+                      listenable: _controller,
+                      builder: (context, _) => HomeLatestUpdatesSection(
                         latestUpdates: _controller.latestUpdates,
                         isLoading: _controller.isLoadingLatest,
                         isDark: isDark,
@@ -283,8 +300,13 @@ class _HomeScreenState extends State<HomeScreen>
                         onNavigateToDiscover: () =>
                             _navigateToDiscover(sortBy: 'updatedAt'),
                       ),
-                      const SizedBox(height: 28),
-                      HomeTopMangaSection(
+                    ),
+                  ),
+                  const SizedBox(height: 28),
+                  RepaintBoundary(
+                    child: ListenableBuilder(
+                      listenable: _controller,
+                      builder: (context, _) => HomeTopMangaSection(
                         topManga: _controller.topManga,
                         isLoading: _controller.isLoadingTop,
                         isDark: isDark,
@@ -298,8 +320,13 @@ class _HomeScreenState extends State<HomeScreen>
                         onNavigateToDiscover: () =>
                             _navigateToDiscover(sortBy: 'rating'),
                       ),
-                      const SizedBox(height: 28),
-                      HomeRecommendedSection(
+                    ),
+                  ),
+                  const SizedBox(height: 28),
+                  RepaintBoundary(
+                    child: ListenableBuilder(
+                      listenable: _controller,
+                      builder: (context, _) => HomeRecommendedSection(
                         recommendedManga: _controller.recommendedManga,
                         isLoading: _controller.isLoadingRecommended,
                         isDark: isDark,
@@ -311,14 +338,14 @@ class _HomeScreenState extends State<HomeScreen>
                               heroTag: 'manga-cover-recommended-$id',
                             ),
                       ),
-                    ]),
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
-          ),
-        );
-      },
+          ],
+        ),
+      ),
     );
   }
 }

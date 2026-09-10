@@ -137,52 +137,52 @@ class _HomeHeroCarouselState extends State<HomeHeroCarousel> {
     final sanitizedUrl = UrlUtils.sanitizeImageUrl(rawUrl);
     final heroTag = 'manga-cover-hero-${manga.id}';
 
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
-      child: Material(
-        color: Colors.transparent,
-        borderRadius: BorderRadius.circular(20),
-        clipBehavior: Clip.antiAlias,
-        child: InkWell(
-          onTap: () =>
-              widget.onSelectManga(manga.id, summary: manga, heroTag: heroTag),
+    return RepaintBoundary(
+      child: Container(
+        margin: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+        child: Material(
+          color: Colors.transparent,
           borderRadius: BorderRadius.circular(20),
-          child: Stack(
-            fit: StackFit.expand,
-            children: [
-              // 1. Blurred Background Image
-              if (sanitizedUrl.isNotEmpty)
-                CachedNetworkImage(
-                  imageUrl: sanitizedUrl,
-                  httpHeaders: headers,
-                  fit: BoxFit.cover,
-                  errorBuilder: (context, error, stackTrace) =>
-                      const ColoredBox(color: Color(0xFF1E1E2E)),
-                )
-              else
-                const ColoredBox(color: Color(0xFF1E1E2E)),
+          clipBehavior: Clip.antiAlias,
+          child: InkWell(
+            onTap: () =>
+                widget.onSelectManga(manga.id, summary: manga, heroTag: heroTag),
+            borderRadius: BorderRadius.circular(20),
+            child: Stack(
+              fit: StackFit.expand,
+              children: [
+                // 1. Blurred Background Image (using ImageFiltered to avoid expensive GPU screen readback)
+                if (sanitizedUrl.isNotEmpty)
+                  ImageFiltered(
+                    imageFilter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
+                    child: CachedNetworkImage(
+                      imageUrl: sanitizedUrl,
+                      httpHeaders: headers,
+                      fit: BoxFit.cover,
+                      memCacheWidth: 600,
+                      maxWidthDiskCache: 800,
+                      errorBuilder: (context, error, stackTrace) =>
+                          const ColoredBox(color: Color(0xFF1E1E2E)),
+                    ),
+                  )
+                else
+                  const ColoredBox(color: Color(0xFF1E1E2E)),
 
-              // 2. Blur Filter
-              BackdropFilter(
-                filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
-                child: const SizedBox.expand(),
-              ),
-
-              // 3. Rich Gradient Overlays for High Contrast
-              DecoratedBox(
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    stops: const [0.0, 0.45, 1.0],
-                    colors: [
-                      Colors.black.withValues(alpha: 0.65),
-                      Colors.black.withValues(alpha: 0.85),
-                      Colors.black.withValues(alpha: 0.95),
-                    ],
+                // 2. Rich Gradient Overlays for High Contrast
+                DecoratedBox(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      stops: const [0.0, 0.45, 1.0],
+                      colors: [
+                        Colors.black.withValues(alpha: 0.65),
+                        Colors.black.withValues(alpha: 0.85),
+                        Colors.black.withValues(alpha: 0.95),
+                      ],
+                    ),
                   ),
                 ),
-              ),
 
               // 4. Subtle Border
               DecoratedBox(
@@ -429,6 +429,8 @@ class _HomeHeroCarouselState extends State<HomeHeroCarousel> {
                                   imageUrl: sanitizedUrl,
                                   httpHeaders: headers,
                                   fit: BoxFit.cover,
+                                  memCacheWidth: 350,
+                                  maxWidthDiskCache: 500,
                                   placeholder: (context, url) => Container(
                                     color: Colors.black38,
                                     child: const Center(
@@ -469,8 +471,9 @@ class _HomeHeroCarouselState extends State<HomeHeroCarousel> {
           ),
         ),
       ),
-    );
-  }
+    ),
+  );
+}
 
   Widget _buildPageIndicators() {
     return Row(
