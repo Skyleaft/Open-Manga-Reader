@@ -37,6 +37,8 @@ class _ReaderScreenState extends State<ReaderScreen>
 
   bool _showUI = true;
   bool _isLoading = false;
+  bool _isChangingChapter = false;
+  DateTime _lastChapterChangeTime = DateTime.fromMillisecondsSinceEpoch(0);
   Timer? _debounceTimer;
   bool _isSliderScrolling = false;
   bool _isRestoringScroll = false;
@@ -338,6 +340,7 @@ class _ReaderScreenState extends State<ReaderScreen>
     if (_isSliderScrolling ||
         _isRestoringScroll ||
         _isJumpingToPage ||
+        _isChangingChapter ||
         _isLoading) {
       return;
     }
@@ -426,28 +429,18 @@ class _ReaderScreenState extends State<ReaderScreen>
   }
 
   Future<void> _changeChapter(bool next) async {
-    if (next && _pageUrls.isNotEmpty) {
-      if (_debounceTimer?.isActive ?? false) {
-        _debounceTimer!.cancel();
-      }
-      _currentPage = _pageUrls.length;
-      _progress = 1.0;
-      await _saveProgression();
+    if (_isChangingChapter || _isLoading) return;
+
+    final now = DateTime.now();
+    if (now.difference(_lastChapterChangeTime).inMilliseconds < 600) {
+      return;
     }
 
-    final chapters = widget.content.allChapters;
-    final currentIndex = chapters.indexWhere(
-      (c) => c.chapterNumber == _currentChapterNumber,
-    );
+    final targetChapter = next
+        ? widget.content.getNextChapter(_chapterId, _currentChapterNumber)
+        : widget.content.getPreviousChapter(_chapterId, _currentChapterNumber);
 
-    int targetIndex;
-    if (next) {
-      targetIndex = currentIndex - 1;
-    } else {
-      targetIndex = currentIndex + 1;
-    }
-
-    if (targetIndex < 0 || targetIndex >= chapters.length) {
+    if (targetChapter == null) {
       if (!mounted) return;
       AlertBanner.show(
         context,
@@ -464,20 +457,57 @@ class _ReaderScreenState extends State<ReaderScreen>
       return;
     }
 
-    final targetChapter = chapters[targetIndex];
-    await _loadChapter(targetChapter);
+    _isChangingChapter = true;
+    _accumulatedBottomOverscroll = 0.0;
+
+    // Immediately show loading indicator and block all scrolling/interaction
+    setState(() {
+      _isLoading = true;
+      _isRestoringScroll = true;
+      _isJumpingToPage = true;
+    });
+
+    if (next && _pageUrls.isNotEmpty) {
+      if (_debounceTimer?.isActive ?? false) {
+        _debounceTimer!.cancel();
+      }
+      _currentPage = _pageUrls.length;
+      _progress = 1.0;
+      try {
+        await _saveProgression();
+      } catch (e) {
+        debugPrint('Failed to save progression: $e');
+      }
+    }
+
+    await _loadChapterInternal(targetChapter);
   }
 
   Future<void> _loadChapter(
     Chapter targetChapter, {
     int initialPage = 1,
   }) async {
+    if (_isChangingChapter || _isLoading) return;
+    if (targetChapter.id == _chapterId) return;
+
+    _isChangingChapter = true;
+    _accumulatedBottomOverscroll = 0.0;
+
+    setState(() {
+      _isLoading = true;
+      _isRestoringScroll = true;
+      _isJumpingToPage = true;
+    });
+
+    await _loadChapterInternal(targetChapter, initialPage: initialPage);
+  }
+
+  Future<void> _loadChapterInternal(
+    Chapter targetChapter, {
+    int initialPage = 1,
+  }) async {
     _chapterCancelToken?.cancel();
     _chapterCancelToken = CancelToken();
-
-    _isRestoringScroll = true;
-    _isJumpingToPage = true;
-    setState(() => _isLoading = true);
 
     try {
       _apiService.incrementChapterView(
@@ -512,6 +542,10 @@ class _ReaderScreenState extends State<ReaderScreen>
         targetPageUrls.isEmpty ? 1 : targetPageUrls.length,
       );
 
+      if (_scrollController.hasClients) {
+        _scrollController.jumpTo(0.0);
+      }
+
       setState(() {
         _pageUrls = targetPageUrls;
         _chapterId = targetChapter.id;
@@ -521,8 +555,8 @@ class _ReaderScreenState extends State<ReaderScreen>
             : 0.0;
         _currentPage = safeInitialPage;
         _isLoading = false;
-        _isRestoringScroll = false;
-        _isJumpingToPage = false;
+        _isRestoringScroll = true;
+        _isJumpingToPage = true;
         _accumulatedBottomOverscroll = 0.0;
         _transformationController.value = Matrix4.identity();
       });
@@ -535,6 +569,15 @@ class _ReaderScreenState extends State<ReaderScreen>
         if (_pageController.hasClients) {
           _pageController.jumpToPage(safeInitialPage - 1);
         }
+
+        Future.delayed(const Duration(milliseconds: 200), () {
+          if (mounted) {
+            setState(() {
+              _isRestoringScroll = false;
+              _isJumpingToPage = false;
+            });
+          }
+        });
       });
 
       if (safeInitialPage > 1) {
@@ -561,6 +604,9 @@ class _ReaderScreenState extends State<ReaderScreen>
           type: AlertBannerType.error,
         );
       }
+    } finally {
+      _isChangingChapter = false;
+      _lastChapterChangeTime = DateTime.now();
     }
   }
 
@@ -804,7 +850,9 @@ class _ReaderScreenState extends State<ReaderScreen>
     if (_pageUrls.isEmpty) return;
 
     if (index == _pageUrls.length) {
-      _changeChapter(true);
+      if (!_isLoading && !_isChangingChapter) {
+        _changeChapter(true);
+      }
       return;
     }
 
@@ -871,10 +919,8 @@ class _ReaderScreenState extends State<ReaderScreen>
   @override
   Widget build(BuildContext context) {
     final chapters = widget.content.allChapters;
-    final currentIndex = chapters.indexWhere(
-      (c) => c.chapterNumber == _currentChapterNumber,
-    );
-    final hasNextChapter = currentIndex > 0;
+    final hasNextChapter =
+        widget.content.hasNextChapter(_chapterId, _currentChapterNumber);
 
     final double maxChapter = chapters.fold(
       0.0,
@@ -910,14 +956,17 @@ class _ReaderScreenState extends State<ReaderScreen>
               NotificationListener<ScrollNotification>(
                 onNotification: (notification) {
                   if (notification is UserScrollNotification) {
-                    _isRestoringScroll = false;
-                    _isJumpingToPage = false;
+                    if (!_isChangingChapter && !_isLoading) {
+                      _isRestoringScroll = false;
+                      _isJumpingToPage = false;
+                    }
                   } else if (notification is OverscrollNotification) {
                     if (_isWebtoonMode &&
                         notification.overscroll > 0 &&
                         notification.metrics.pixels >=
                             notification.metrics.maxScrollExtent &&
                         !_isLoading &&
+                        !_isChangingChapter &&
                         !_isRestoringScroll &&
                         !_isJumpingToPage &&
                         !_isSliderScrolling) {
@@ -936,6 +985,7 @@ class _ReaderScreenState extends State<ReaderScreen>
                   } else if (notification is ScrollUpdateNotification) {
                     if (_isWebtoonMode &&
                         !_isLoading &&
+                        !_isChangingChapter &&
                         !_isRestoringScroll &&
                         !_isJumpingToPage &&
                         !_isSliderScrolling &&

@@ -254,9 +254,11 @@ class _ReaderContentWidgetState extends State<ReaderContentWidget> {
                                   Material(
                                     color: Colors.transparent,
                                     child: InkWell(
-                                      onTap: () => widget.onPageChanged(
-                                        widget.pageUrls.length,
-                                      ),
+                                      onTap: widget.isLoading
+                                          ? null
+                                          : () => widget.onPageChanged(
+                                                widget.pageUrls.length,
+                                              ),
                                       borderRadius: BorderRadius.circular(16),
                                       child: Container(
                                         padding: const EdgeInsets.symmetric(
@@ -348,7 +350,9 @@ class _ReaderContentWidgetState extends State<ReaderContentWidget> {
                     return Center(
                       child: GestureDetector(
                         behavior: HitTestBehavior.opaque,
-                        onTap: () => widget.onPageChanged(widget.pageUrls.length),
+                        onTap: widget.isLoading
+                            ? null
+                            : () => widget.onPageChanged(widget.pageUrls.length),
                         child: Column(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
