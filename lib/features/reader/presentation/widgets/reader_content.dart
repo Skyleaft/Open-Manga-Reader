@@ -25,6 +25,8 @@ class ReaderContentWidget extends StatefulWidget {
   final Map<int, double>? pageAspectRatios;
   final void Function(int index, double ratio)? onAspectRatioResolved;
   final bool hasNextChapter;
+  final GlobalKey Function(int index)? getPageKey;
+  final double defaultAspectRatio;
 
   const ReaderContentWidget({
     super.key,
@@ -46,6 +48,8 @@ class ReaderContentWidget extends StatefulWidget {
     this.pageAspectRatios,
     this.onAspectRatioResolved,
     this.hasNextChapter = true,
+    this.getPageKey,
+    this.defaultAspectRatio = 1.4,
   });
 
   @override
@@ -146,7 +150,7 @@ class _ReaderContentWidgetState extends State<ReaderContentWidget> {
                   slivers: [
                     SliverVariedExtentList(
                       itemExtentBuilder: (index, dimensions) {
-                        final ratio = widget.pageAspectRatios?[index] ?? 1.4;
+                        final ratio = widget.pageAspectRatios?[index] ?? widget.defaultAspectRatio;
                         return contentWidth * ratio;
                       },
                       delegate: SliverChildBuilderDelegate(
@@ -163,7 +167,8 @@ class _ReaderContentWidgetState extends State<ReaderContentWidget> {
                             child: Align(
                               alignment: Alignment.center,
                               child: SizedBox(
-                                key: GlobalObjectKey('webtoon_${widget.chapterId ?? "default"}_page_$index'),
+                                key: widget.getPageKey?.call(index) ??
+                                    GlobalObjectKey('webtoon_${widget.chapterId ?? "default"}_page_$index'),
                                 width: contentWidth,
                                 child: AppNetworkImage(
                                   imageUrl: url,

@@ -62,6 +62,7 @@ class _ReaderScreenState extends State<ReaderScreen>
   late double _currentChapterNumber;
 
   final Map<int, double> _pageAspectRatios = {};
+  final Map<int, GlobalKey> _pageKeys = {};
   double _progress = 0.0;
   int _currentPage = 1;
   TapDownDetails? _doubleTapDetails;
@@ -120,6 +121,13 @@ class _ReaderScreenState extends State<ReaderScreen>
     _checkInitialFullscreen();
   }
 
+  GlobalKey _getPageKey(int index) {
+    return _pageKeys.putIfAbsent(
+      index,
+      () => GlobalKey(debugLabel: 'webtoon_page_$index'),
+    );
+  }
+
   double _calculateAverageRatio() {
     if (_pageAspectRatios.isNotEmpty) {
       final sum = _pageAspectRatios.values.fold(0.0, (a, b) => a + b);
@@ -130,6 +138,22 @@ class _ReaderScreenState extends State<ReaderScreen>
 
   double _calculateEstimatedOffset(int targetIndex, double contentWidth) {
     if (targetIndex <= 0 || _pageUrls.isEmpty) return 0.0;
+
+    // If target is the last page and scrollController is ready, target maxScrollExtent directly
+    if (_scrollController.hasClients && targetIndex >= _pageUrls.length - 1) {
+      final maxScroll = _scrollController.position.maxScrollExtent;
+      if (maxScroll > 0) return maxScroll;
+    }
+
+    // If we have maxScrollExtent but aspect ratios are mostly unknown, use proportional estimate
+    if (_scrollController.hasClients && _pageUrls.length > 1) {
+      final maxScroll = _scrollController.position.maxScrollExtent;
+      if (maxScroll > 0 && _pageAspectRatios.length < (_pageUrls.length / 2)) {
+        final progressRatio = targetIndex / (_pageUrls.length - 1);
+        return progressRatio * maxScroll;
+      }
+    }
+
     final avgRatio = _calculateAverageRatio();
     double offset = 0.0;
     for (int i = 0; i < targetIndex; i++) {
@@ -144,7 +168,7 @@ class _ReaderScreenState extends State<ReaderScreen>
     double minDistance = double.infinity;
 
     for (int i = 0; i < _pageUrls.length; i++) {
-      final key = GlobalObjectKey('webtoon_${_chapterId}_page_$i');
+      final key = _getPageKey(i);
       final ctx = key.currentContext;
       if (ctx != null) {
         final renderBox = ctx.findRenderObject() as RenderBox?;
@@ -202,9 +226,7 @@ class _ReaderScreenState extends State<ReaderScreen>
           return;
         }
 
-        final targetKey = GlobalObjectKey(
-          'webtoon_${_chapterId}_page_$targetIndex',
-        );
+        final targetKey = _getPageKey(targetIndex);
         final targetContext = targetKey.currentContext;
         if (targetContext != null) {
           Scrollable.ensureVisible(
@@ -229,7 +251,7 @@ class _ReaderScreenState extends State<ReaderScreen>
               });
             }
           });
-        } else if (retryCount < 3) {
+        } else if (retryCount < 4) {
           final visibleIndex = _getClosestVisiblePageIndex();
           if (visibleIndex != null && visibleIndex != targetIndex) {
             final avgRatio = _calculateAverageRatio();
@@ -244,6 +266,12 @@ class _ReaderScreenState extends State<ReaderScreen>
               retryCount: retryCount + 1,
             );
           } else {
+            if (targetIndex >= _pageUrls.length - 1 && _scrollController.hasClients) {
+              final maxScroll = _scrollController.position.maxScrollExtent;
+              if (maxScroll > 0) {
+                _scrollController.jumpTo(maxScroll);
+              }
+            }
             setState(() {
               _isRestoringScroll = false;
             });
@@ -257,6 +285,12 @@ class _ReaderScreenState extends State<ReaderScreen>
             _onScroll();
           }
         } else {
+          if (targetIndex >= _pageUrls.length - 1 && _scrollController.hasClients) {
+            final maxScroll = _scrollController.position.maxScrollExtent;
+            if (maxScroll > 0) {
+              _scrollController.jumpTo(maxScroll);
+            }
+          }
           setState(() {
             _isRestoringScroll = false;
           });
@@ -371,7 +405,7 @@ class _ReaderScreenState extends State<ReaderScreen>
       activePage = _pageUrls.length;
     } else {
       for (int i = 0; i < _pageUrls.length; i++) {
-        final key = GlobalObjectKey('webtoon_${_chapterId}_page_$i');
+        final key = _getPageKey(i);
         final ctx = key.currentContext;
         if (ctx != null) {
           final renderBox = ctx.findRenderObject() as RenderBox?;
@@ -523,6 +557,7 @@ class _ReaderScreenState extends State<ReaderScreen>
 
       PaintingBinding.instance.imageCache.clearLiveImages();
       _pageAspectRatios.clear();
+      _pageKeys.clear();
       for (int i = 0; i < pages.length; i++) {
         if (pages[i].aspectRatio != null) {
           _pageAspectRatios[i] = pages[i].aspectRatio!;
@@ -1022,6 +1057,8 @@ class _ReaderScreenState extends State<ReaderScreen>
                   isWebtoonMode: _isWebtoonMode,
                   isRtlMode: _isRtlMode,
                   pageAspectRatios: _pageAspectRatios,
+                  defaultAspectRatio: _calculateAverageRatio(),
+                  getPageKey: _getPageKey,
                   hasNextChapter: hasNextChapter,
                   onAspectRatioResolved: (index, ratio) {
                     _pageAspectRatios[index] = ratio;
