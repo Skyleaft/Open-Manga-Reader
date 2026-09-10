@@ -275,7 +275,7 @@ class _AppNetworkImageState extends State<AppNetworkImage> {
                 }
                 stream.removeListener(listener);
               },
-              onError: (_, __) {
+              onError: (_, _) {
                 stream.removeListener(listener);
               },
             );
