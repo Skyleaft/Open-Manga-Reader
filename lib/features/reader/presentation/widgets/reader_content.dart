@@ -90,10 +90,10 @@ class _ReaderContentWidgetState extends State<ReaderContentWidget> {
         final url = UrlUtils.sanitizeImageUrl(rawUrl);
         if (!_precachedUrls.contains(url)) {
           _precachedUrls.add(url);
-          final bool isLocal =
-              !url.startsWith('http://') && !url.startsWith('https://');
+          final bool isLocal = UrlUtils.isLocalFilePath(url);
           if (isLocal) {
-            precacheImage(FileImage(File(url)), context);
+            final normalizedPath = UrlUtils.normalizeLocalFilePath(url);
+            precacheImage(FileImage(File(normalizedPath)), context);
           } else {
             precacheImage(
               CachedNetworkImageProvider(

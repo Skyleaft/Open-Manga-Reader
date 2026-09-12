@@ -1,4 +1,5 @@
 import '../../../core/models/chapter_page.dart';
+import '../../../core/utils/url_utils.dart';
 import '../../manga_detail/models/manga_detail.dart';
 import '../../settings/services/storage_service.dart';
 
@@ -41,7 +42,9 @@ class DownloadedChapter {
   String get formattedSize => StorageService.formatBytes(sizeBytes);
 
   List<ChapterPage> toChapterPages() {
-    return pageFilePaths.map((path) => ChapterPage(url: path)).toList();
+    return pageFilePaths
+        .map((path) => ChapterPage(url: UrlUtils.normalizeLocalFilePath(path)))
+        .toList();
   }
 
   Map<String, dynamic> toMap() {
@@ -61,8 +64,10 @@ class DownloadedChapter {
 
   factory DownloadedChapter.fromMap(Map<String, dynamic> map) {
     final rawPaths = map['pageFilePaths'] as List<dynamic>?;
-    final List<String> paths =
-        rawPaths?.map((e) => e.toString()).toList() ?? [];
+    final List<String> paths = rawPaths
+            ?.map((e) => UrlUtils.normalizeLocalFilePath(e.toString()))
+            .toList() ??
+        [];
 
     return DownloadedChapter(
       mangaId: map['mangaId'] as String? ?? '',
