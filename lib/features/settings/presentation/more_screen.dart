@@ -12,6 +12,8 @@ import '../../../core/widgets/alert_banner.dart';
 import '../../auth/services/auth_service.dart';
 import '../../history/models/progression.dart';
 import '../../history/services/progression_service.dart';
+import '../../../routes/app_pages.dart';
+import '../../download/services/download_service.dart';
 import '../../library/models/library_manga.dart';
 import '../../manga_detail/services/manga_detail_service.dart';
 import '../services/storage_service.dart';
@@ -43,23 +45,38 @@ class _MoreScreenState extends State<MoreScreen>
   int _totalChaptersRead = 0;
   int _totalReadingTimeSeconds = 0;
   int _cacheSizeBytes = 0;
+  int _downloadedSizeBytes = 0;
+  int _downloadedCount = 0;
 
   @override
   void initState() {
     super.initState();
     _loadAppVersion();
     _loadStats();
-    _loadCacheSize();
+    _loadStorageSizes();
   }
 
-  Future<void> _loadCacheSize() async {
-    final size = await _storageService.getCacheSizeBytes();
+  Future<void> _loadStorageSizes() async {
+    final cacheSize = await _storageService.getCacheSizeBytes();
+    int downloadSize = 0;
+    int downloadCount = 0;
+    try {
+      final downloadService = getIt<DownloadService>();
+      downloadSize = downloadService.getTotalDownloadedBytes();
+      final groups = downloadService.getDownloadsGroupedByManga();
+      downloadCount = groups.fold<int>(0, (sum, g) => sum + g.chapterCount);
+    } catch (_) {}
+
     if (mounted) {
       setState(() {
-        _cacheSizeBytes = size;
+        _cacheSizeBytes = cacheSize;
+        _downloadedSizeBytes = downloadSize;
+        _downloadedCount = downloadCount;
       });
     }
   }
+
+  Future<void> _loadCacheSize() => _loadStorageSizes();
 
   Future<void> _loadStats() async {
     if (!mounted) return;
@@ -409,8 +426,10 @@ class _MoreScreenState extends State<MoreScreen>
                 context,
                 icon: Icons.download_done_rounded,
                 title: 'Downloaded Chapters',
-                subtitle: 'Offline storage (Coming soon)',
-                onTap: _showDownloadsInfoDialog,
+                subtitle: _downloadedCount > 0
+                    ? '$_downloadedCount chapters (${StorageService.formatBytes(_downloadedSizeBytes)})'
+                    : 'Manage offline chapters',
+                onTap: _openDownloadedChapters,
               ),
               _buildMenuItem(
                 context,
@@ -434,7 +453,9 @@ class _MoreScreenState extends State<MoreScreen>
                       builder: (context) => const StorageSettingScreen(),
                     ),
                   );
-                  _loadCacheSize();
+                  if (mounted) {
+                    _loadStorageSizes();
+                  }
                 },
               ),
 
@@ -936,99 +957,13 @@ class _MoreScreenState extends State<MoreScreen>
     }
   }
 
-  void _showDownloadsInfoDialog() {
+  Future<void> _openDownloadedChapters() async {
     HapticFeedback.selectionClick();
-    showDialog(
-      context: context,
-      builder: (context) {
-        final theme = Theme.of(context);
-        final isDark = theme.brightness == Brightness.dark;
-        return AlertDialog(
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(24),
-          ),
-          title: Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: theme.colorScheme.primary.withValues(alpha: 0.15),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Icon(
-                  Icons.download_rounded,
-                  color: theme.colorScheme.primary,
-                  size: 24,
-                ),
-              ),
-              const SizedBox(width: 12),
-              const Expanded(
-                child: Text(
-                  'Offline Downloads',
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 18,
-                  ),
-                ),
-              ),
-            ],
-          ),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Chapter download feature is currently under active development. In an upcoming update, you will be able to download full manga chapters for smooth offline reading on the go!',
-                style: TextStyle(
-                  color: isDark ? Colors.white70 : const Color(0xFF475569),
-                  fontSize: 14,
-                  height: 1.5,
-                ),
-              ),
-              const SizedBox(height: 16),
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: isDark
-                      ? const Color(0xFF1E293B)
-                      : theme.colorScheme.primary.withValues(alpha: 0.08),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(
-                    color: theme.colorScheme.primary.withValues(alpha: 0.2),
-                  ),
-                ),
-                child: Row(
-                  children: [
-                    Icon(
-                      Icons.auto_awesome_rounded,
-                      color: theme.colorScheme.primary,
-                      size: 20,
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Text(
-                        'Storage management is already configured and ready for downloaded packages.',
-                        style: TextStyle(
-                          fontSize: 12.5,
-                          fontWeight: FontWeight.w500,
-                          color: isDark ? Colors.white70 : Colors.black87,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Got it'),
-            ),
-          ],
-        );
-      },
-    );
+    if (!mounted) return;
+    await Navigator.pushNamed(context, AppRoutes.downloadedChapters);
+    if (mounted) {
+      _loadStorageSizes();
+    }
   }
 
   Widget _buildHeader(bool isDark, User? user) {
