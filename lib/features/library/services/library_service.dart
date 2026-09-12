@@ -5,6 +5,7 @@ import '../../../core/di/injection.dart';
 import '../../../core/network/manga_api_service.dart';
 import '../../../core/network/sync_service.dart';
 import '../../../core/services/notification_service.dart';
+import 'library_cache_service.dart';
 
 class LibraryService {
 
@@ -14,10 +15,13 @@ class LibraryService {
     // 1. Update local cache immediately
     await _updateLocalCache(manga, isRemoving: false);
 
-    // 2. Subscribe to FCM topic for chapter updates
+    // 2. Pre-cache cover and details in background
+    getIt<LibraryCacheService>().cacheSingleManga(manga);
+
+    // 3. Subscribe to FCM topic for chapter updates
     getIt<NotificationService>().subscribeToMangaTopic(manga.id);
 
-    // 3. Try API
+    // 4. Try API
     final apiService = getIt<MangaApiService>();
     final payload = manga.toApiRequest(_currentUserId);
     try {
@@ -125,6 +129,9 @@ class LibraryService {
     // 2. Sync with API only if forced or if cache is stale & empty
     if (forceSync || (isStale && localLibrary.isEmpty)) {
       _syncLibraryFromApi(apiService, syncService);
+    } else if (localLibrary.isNotEmpty) {
+      // Ensure any missing covers or details are pre-cached in background
+      getIt<LibraryCacheService>().cacheAllLibraryData(localLibrary);
     }
 
     return localLibrary;
@@ -207,6 +214,9 @@ class LibraryService {
       getIt<NotificationService>().syncLibraryTopics(
         finalLibrary.map((m) => m.id).toList(),
       );
+
+      // Pre-cache all covers and manga details for offline mode
+      getIt<LibraryCacheService>().cacheAllLibraryData(finalLibrary);
 
       syncService.syncPendingActions();
     } catch (_) {

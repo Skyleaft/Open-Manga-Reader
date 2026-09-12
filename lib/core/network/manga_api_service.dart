@@ -7,6 +7,8 @@ import '../config/app_config.dart';
 import '../models/manga_summary.dart';
 import '../models/paged_response.dart';
 import '../models/chapter_page.dart';
+import '../di/injection.dart';
+import '../services/network_status_service.dart';
 import '../widgets/alert_banner.dart';
 import '../../features/discover/models/advanced_recommendation_request.dart';
 import '../../features/discover/models/query_paged_manga_request.dart';
@@ -78,6 +80,9 @@ class MangaApiService {
           return handler.next(options);
         },
         onResponse: (response, handler) {
+          if (getIt.isRegistered<NetworkStatusService>()) {
+            getIt<NetworkStatusService>().reportNetworkSuccess();
+          }
           if (kDebugMode) {
             final startTime =
                 response.requestOptions.extra['requestStartTime'] as int?;
@@ -91,6 +96,14 @@ class MangaApiService {
           return handler.next(response);
         },
         onError: (DioException e, handler) async {
+          if (e.type == DioExceptionType.connectionError ||
+              e.type == DioExceptionType.connectionTimeout ||
+              e.type == DioExceptionType.sendTimeout ||
+              e.type == DioExceptionType.receiveTimeout) {
+            if (getIt.isRegistered<NetworkStatusService>()) {
+              getIt<NetworkStatusService>().reportNetworkError();
+            }
+          }
           if (kDebugMode) {
             final startTime =
                 e.requestOptions.extra['requestStartTime'] as int?;

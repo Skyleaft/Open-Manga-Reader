@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/di/injection.dart';
 import '../../../core/network/manga_api_service.dart';
+import '../../../core/services/network_status_service.dart';
 import '../../../core/widgets/alert_banner.dart';
 import '../../../routes/app_pages.dart';
 import '../../manga_detail/models/manga_detail.dart';
@@ -28,6 +29,10 @@ class _LibraryScreenState extends State<LibraryScreen>
   final MangaApiService _apiService = getIt<MangaApiService>();
   final MangaDetailService _detailService = getIt<MangaDetailService>();
 
+  bool get _isOffline =>
+      getIt.isRegistered<NetworkStatusService>() &&
+      !getIt<NetworkStatusService>().isOnline;
+
   @override
   bool get wantKeepAlive => true;
 
@@ -41,9 +46,9 @@ class _LibraryScreenState extends State<LibraryScreen>
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    final modalRoute = ModalRoute.of(context);
-    if (modalRoute is PageRoute) {
-      AppRoutes.routeObserver.subscribe(this, modalRoute);
+    final route = ModalRoute.of(context);
+    if (route is PageRoute) {
+      AppRoutes.routeObserver.subscribe(this, route);
     }
   }
 
@@ -58,6 +63,19 @@ class _LibraryScreenState extends State<LibraryScreen>
   void didPopNext() {
     // Called when navigating back, reload from local cache without triggering network calls
     _controller.loadLibrary();
+  }
+
+  Future<void> _handleRefresh() async {
+    if (_isOffline) {
+      AlertBanner.show(
+        context,
+        'Cannot refresh while offline. Showing cached library.',
+        type: AlertBannerType.info,
+      );
+      await _controller.loadLibrary();
+      return;
+    }
+    await _controller.refresh();
   }
 
   Future<void> _navigateToMangaDetail(String mangaId, {String? heroTag}) async {
@@ -80,13 +98,24 @@ class _LibraryScreenState extends State<LibraryScreen>
         });
       }
 
-      _apiService
-          .getMangaDetail(mangaId)
-          .then((data) {
-            final fresh = MangaDetail.fromMap(data);
-            _detailService.saveDetail(fresh);
-          })
-          .catchError((_) {});
+      if (!_isOffline) {
+        _apiService
+            .getMangaDetail(mangaId)
+            .then((data) {
+              final fresh = MangaDetail.fromMap(data);
+              _detailService.saveDetail(fresh);
+            })
+            .catchError((_) {});
+      }
+      return;
+    }
+
+    if (_isOffline) {
+      AlertBanner.show(
+        context,
+        'Manga details are not cached for offline reading.',
+        type: AlertBannerType.warning,
+      );
       return;
     }
 
@@ -300,6 +329,38 @@ class _LibraryScreenState extends State<LibraryScreen>
     );
   }
 
+  Widget _buildOfflineBanner(bool isDark) {
+    return SliverToBoxAdapter(
+      child: Container(
+        margin: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+        decoration: BoxDecoration(
+          color: Colors.amber.withValues(alpha: isDark ? 0.15 : 0.12),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: Colors.amber.withValues(alpha: 0.4),
+          ),
+        ),
+        child: Row(
+          children: [
+            const Icon(Icons.cloud_off_rounded, color: Colors.amber, size: 20),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                'Offline Mode — Showing cached library',
+                style: TextStyle(
+                  color: isDark ? Colors.amber[200] : Colors.amber[900],
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     super.build(context);
@@ -311,7 +372,7 @@ class _LibraryScreenState extends State<LibraryScreen>
         return SafeArea(
           child: RefreshIndicator(
             color: AppColors.primary,
-            onRefresh: _controller.refresh,
+            onRefresh: _handleRefresh,
             child: CustomScrollView(
               physics: const AlwaysScrollableScrollPhysics(
                 parent: BouncingScrollPhysics(),
@@ -348,6 +409,7 @@ class _LibraryScreenState extends State<LibraryScreen>
                     ),
                   ),
                 ),
+                if (_isOffline) _buildOfflineBanner(isDark),
                 SliverPadding(
                   padding: const EdgeInsets.fromLTRB(16, 16, 16, 150),
                   sliver: _buildContent(context, isDark),

@@ -1,6 +1,10 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
+import '../../../core/di/injection.dart';
+import '../../../core/services/network_status_service.dart';
+import '../../../core/widgets/alert_banner.dart';
 import '../../../core/widgets/app_bottom_nav.dart';
 import '../../discover/presentation/discover_screen.dart';
 import '../../home/presentation/home_screen.dart';
@@ -21,16 +25,57 @@ class _MainScreenState extends State<MainScreen> {
   String? _discoverSortBy;
   String? _discoverSearch;
   DateTime? _lastBackPressTime;
+  StreamSubscription<bool>? _networkSubscription;
 
   @override
   void initState() {
     super.initState();
+    final networkService = getIt.isRegistered<NetworkStatusService>()
+        ? getIt<NetworkStatusService>()
+        : null;
+
+    final isOffline = networkService != null && !networkService.isOnline;
+    _currentIndex = isOffline ? 1 : 0;
     _pageController = PageController(initialPage: _currentIndex);
+
+    if (isOffline) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          AlertBanner.show(
+            context,
+            'No internet connection. Switched to offline mode.',
+            type: AlertBannerType.warning,
+          );
+        }
+      });
+    }
+
+    if (networkService != null) {
+      _networkSubscription = networkService.onStatusChange.listen((isOnline) {
+        if (!mounted) return;
+        if (!isOnline) {
+          AlertBanner.show(
+            context,
+            'No internet connection. Switched to offline mode.',
+            type: AlertBannerType.warning,
+          );
+          _navigateTo(1);
+        } else {
+          AlertBanner.show(
+            context,
+            'Connection restored. Back online.',
+            type: AlertBannerType.success,
+          );
+        }
+      });
+    }
+
     _checkForUpdate();
   }
 
   @override
   void dispose() {
+    _networkSubscription?.cancel();
     _pageController.dispose();
     super.dispose();
   }
@@ -90,6 +135,18 @@ class _MainScreenState extends State<MainScreen> {
   }
 
   void _navigateTo(int index) {
+    final isOffline = getIt.isRegistered<NetworkStatusService>() &&
+        !getIt<NetworkStatusService>().isOnline;
+
+    if (isOffline && (index == 0 || index == 2)) {
+      AlertBanner.show(
+        context,
+        'This screen is unavailable in offline mode. Showing your Library.',
+        type: AlertBannerType.warning,
+      );
+      index = 1;
+    }
+
     if (index != _currentIndex) {
       setState(() {
         _currentIndex = index;
