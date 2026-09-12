@@ -8,6 +8,7 @@ class HiveStorage {
   static const String mangaDetailBoxName = 'manga_detail_cache';
   static const String libraryBoxName = 'manga_library';
   static const String progressionBoxName = 'manga_progression';
+  static const String downloadsBoxName = 'downloaded_chapters';
 
   static const String _migratedKey = 'migrated_to_hive_v1';
 
@@ -15,6 +16,7 @@ class HiveStorage {
   static Box<dynamic> get mangaDetailBox => Hive.box(mangaDetailBoxName);
   static Box<dynamic> get libraryBox => Hive.box(libraryBoxName);
   static Box<dynamic> get progressionBox => Hive.box(progressionBoxName);
+  static Box<dynamic> get downloadsBox => Hive.box(downloadsBoxName);
 
   /// Initializes Hive for Flutter and opens all persistent boxes.
   static Future<void> init() async {
@@ -25,6 +27,7 @@ class HiveStorage {
       Hive.openBox(mangaDetailBoxName),
       Hive.openBox(libraryBoxName),
       Hive.openBox(progressionBoxName),
+      Hive.openBox(downloadsBoxName),
     ]);
   }
 

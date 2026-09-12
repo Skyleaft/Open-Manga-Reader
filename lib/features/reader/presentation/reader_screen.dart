@@ -14,6 +14,7 @@ import '../../../core/widgets/alert_banner.dart';
 import '../../history/models/progression.dart';
 import '../../history/services/progression_service.dart';
 import '../../manga_detail/models/manga_detail.dart';
+import '../../download/services/download_service.dart';
 import '../models/reader_content.dart';
 import 'widgets/reader_bottom_bar.dart';
 import 'widgets/reader_chapter_picker_sheet.dart';
@@ -544,33 +545,45 @@ class _ReaderScreenState extends State<ReaderScreen>
     _chapterCancelToken = CancelToken();
 
     try {
-      _apiService.incrementChapterView(
+      final downloadService = getIt<DownloadService>();
+      final downloaded = downloadService.getDownloadedChapter(
         widget.content.mangaId,
         targetChapter.id,
       );
 
-      final pages = await _apiService.getChapterPages(
-        widget.content.mangaId,
-        targetChapter.id,
-        cancelToken: _chapterCancelToken,
-      );
+      List<String> targetPageUrls;
+      if (downloaded != null && downloaded.isComplete) {
+        targetPageUrls = downloaded.pageFilePaths;
+      } else {
+        _apiService.incrementChapterView(
+          widget.content.mangaId,
+          targetChapter.id,
+        );
+
+        final pages = await _apiService.getChapterPages(
+          widget.content.mangaId,
+          targetChapter.id,
+          cancelToken: _chapterCancelToken,
+        );
+
+        for (int i = 0; i < pages.length; i++) {
+          if (pages[i].aspectRatio != null) {
+            _pageAspectRatios[i] = pages[i].aspectRatio!;
+          }
+        }
+
+        targetPageUrls = pages
+            .map((p) => _apiService.getLocalImageUrl(p.url, null))
+            .toList();
+      }
 
       PaintingBinding.instance.imageCache.clearLiveImages();
       _pageAspectRatios.clear();
       _pageKeys.clear();
-      for (int i = 0; i < pages.length; i++) {
-        if (pages[i].aspectRatio != null) {
-          _pageAspectRatios[i] = pages[i].aspectRatio!;
-        }
-      }
       await _saveProgression();
 
       _sessionStartTime = DateTime.now();
       _chapterInitialReadingTimeSeconds = 0;
-
-      final targetPageUrls = pages
-          .map((p) => _apiService.getLocalImageUrl(p.url, null))
-          .toList();
 
       final safeInitialPage = initialPage.clamp(
         1,

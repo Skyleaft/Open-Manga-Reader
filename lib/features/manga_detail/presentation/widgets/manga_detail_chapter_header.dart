@@ -10,6 +10,7 @@ class MangaDetailChapterHeader extends StatefulWidget {
   final VoidCallback onToggleSort;
   final ValueChanged<String> onSearchChanged;
   final VoidCallback onScrapChapters;
+  final VoidCallback? onDownloadChapters;
 
   const MangaDetailChapterHeader({
     super.key,
@@ -19,6 +20,7 @@ class MangaDetailChapterHeader extends StatefulWidget {
     required this.onToggleSort,
     required this.onSearchChanged,
     required this.onScrapChapters,
+    this.onDownloadChapters,
   });
 
   @override
@@ -156,6 +158,19 @@ class _MangaDetailChapterHeaderState extends State<MangaDetailChapterHeader> {
                     size: 20,
                   ),
                 ),
+                if (widget.onDownloadChapters != null)
+                  IconButton(
+                    tooltip: 'Download Chapters',
+                    onPressed: () {
+                      HapticFeedback.selectionClick();
+                      widget.onDownloadChapters!();
+                    },
+                    icon: Icon(
+                      Icons.download_for_offline_outlined,
+                      color: colorScheme.primary,
+                      size: 20,
+                    ),
+                  ),
                 PopupMenuButton<ChapterFilterOption>(
                   tooltip: 'Filter chapters',
                   initialValue: widget.currentFilter,

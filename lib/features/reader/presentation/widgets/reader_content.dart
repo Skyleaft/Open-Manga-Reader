@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:cached_network_image_ce/cached_network_image.dart';
@@ -89,23 +90,29 @@ class _ReaderContentWidgetState extends State<ReaderContentWidget> {
         final url = UrlUtils.sanitizeImageUrl(rawUrl);
         if (!_precachedUrls.contains(url)) {
           _precachedUrls.add(url);
-          precacheImage(
-            CachedNetworkImageProvider(
-              url,
-              headers: widget.httpHeaders,
-              maxWidth: memCacheWidth,
-            ),
-            context,
-            onError: (exception, stackTrace) {
-              try {
-                CachedNetworkImageProvider(
-                  url,
-                  headers: widget.httpHeaders,
-                  maxWidth: memCacheWidth,
-                ).evict();
-              } catch (_) {}
-            },
-          );
+          final bool isLocal =
+              !url.startsWith('http://') && !url.startsWith('https://');
+          if (isLocal) {
+            precacheImage(FileImage(File(url)), context);
+          } else {
+            precacheImage(
+              CachedNetworkImageProvider(
+                url,
+                headers: widget.httpHeaders,
+                maxWidth: memCacheWidth,
+              ),
+              context,
+              onError: (exception, stackTrace) {
+                try {
+                  CachedNetworkImageProvider(
+                    url,
+                    headers: widget.httpHeaders,
+                    maxWidth: memCacheWidth,
+                  ).evict();
+                } catch (_) {}
+              },
+            );
+          }
         }
       }
     }

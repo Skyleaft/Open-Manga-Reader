@@ -7,7 +7,10 @@ import '../../../core/network/manga_api_service.dart';
 import '../../../core/models/manga_summary.dart';
 import '../../../core/widgets/alert_banner.dart';
 import '../../../core/widgets/shimmer_box.dart';
+import '../../../core/models/chapter_page.dart';
 import '../../../routes/app_pages.dart';
+import '../../download/presentation/widgets/manga_download_bottom_sheet.dart';
+import '../../download/services/download_service.dart';
 import '../../reader/models/reader_content.dart';
 import '../controllers/manga_detail_controller.dart';
 import '../models/manga_detail.dart';
@@ -129,12 +132,28 @@ class _MangaDetailScreenState extends State<MangaDetailScreen>
     );
 
     try {
-      _apiService.incrementChapterView(widget.manga.id, chapter.id);
-
-      final pages = await _apiService.getChapterPages(
+      final downloadService = getIt<DownloadService>();
+      final downloaded = downloadService.getDownloadedChapter(
         widget.manga.id,
         chapter.id,
       );
+
+      List<ChapterPage> pages;
+      if (downloaded != null && downloaded.isComplete) {
+        pages = downloaded.toChapterPages();
+      } else {
+        _apiService.incrementChapterView(widget.manga.id, chapter.id);
+
+        final fetched = await _apiService.getChapterPages(
+          widget.manga.id,
+          chapter.id,
+        );
+        pages = fetched
+            .map((p) => p.copyWith(
+                  url: _apiService.getLocalImageUrl(p.url, null),
+                ))
+            .toList();
+      }
 
       if (context.mounted) {
         Navigator.pop(context);
@@ -162,11 +181,7 @@ class _MangaDetailScreenState extends State<MangaDetailScreen>
           chapterId: chapter.id,
           allChapters: _controller.chapters,
           chapterTitle: chapter.title,
-          pages: pages
-              .map((p) => p.copyWith(
-                    url: _apiService.getLocalImageUrl(p.url, null),
-                  ))
-              .toList(),
+          pages: pages,
           currentPage: startingPage,
           progression: progression,
         );
@@ -418,6 +433,14 @@ class _MangaDetailScreenState extends State<MangaDetailScreen>
                                   onFilterChanged: _controller.setChapterFilter,
                                   onToggleSort: _controller.toggleSort,
                                   onSearchChanged: _controller.setSearchQuery,
+                                  onDownloadChapters: () {
+                                    MangaDownloadBottomSheet.show(
+                                      context,
+                                      manga: widget.manga,
+                                      chapters: _controller.chapters,
+                                      progression: _controller.progression,
+                                    );
+                                  },
                                   onScrapChapters: () async {
                                     try {
                                       _controller.startScrapingFeedback();
@@ -821,6 +844,7 @@ class _MangaDetailScreenState extends State<MangaDetailScreen>
                 child: Padding(
                   padding: const EdgeInsets.fromLTRB(20, 0, 20, 12),
                   child: MangaDetailChapterTile(
+                    manga: widget.manga,
                     chapter: chapter,
                     isDark: isDark,
                     log: _controller.getLogForChapter(chapter.chapterNumber),

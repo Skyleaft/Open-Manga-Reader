@@ -10,6 +10,8 @@ import '../features/settings/presentation/base_api_setting_screen.dart';
 import '../features/settings/presentation/theme_setting_screen.dart';
 import '../features/discover/presentation/search_scrap_screen.dart';
 import '../features/discover/presentation/advanced_recommendation_screen.dart';
+import '../features/download/presentation/downloaded_chapters_screen.dart';
+import '../features/settings/presentation/storage_setting_screen.dart';
 
 class AppRoutes {
   static final GlobalKey<NavigatorState> navigatorKey =
@@ -26,6 +28,8 @@ class AppRoutes {
   static const String themeSetting = '/theme_setting';
   static const String searchScrap = '/search_scrap';
   static const String advancedRecommendation = '/advanced_recommendation';
+  static const String downloadedChapters = '/downloaded_chapters';
+  static const String storageSetting = '/storage_setting';
 
   static Map<String, WidgetBuilder> get routes => {
     login: (context) => const LoginScreen(),
@@ -56,6 +60,8 @@ class AppRoutes {
     themeSetting: (context) => const ThemeSettingScreen(),
     searchScrap: (context) => const SearchScrapScreen(),
     advancedRecommendation: (context) => const AdvancedRecommendationScreen(),
+    downloadedChapters: (context) => const DownloadedChaptersScreen(),
+    storageSetting: (context) => const StorageSettingScreen(),
   };
 
   /// Custom transition generator for high-performance, silky-smooth navigation
