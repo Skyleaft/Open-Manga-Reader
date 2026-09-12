@@ -8,10 +8,6 @@
             "name": "my_manga_reader",
             "request": "launch",
             "type": "dart",
-            "args": [
-                "--web-port",
-                "3000"
-            ]
         },
         {
             "name": "my_manga_reader (web - port 3000)",
