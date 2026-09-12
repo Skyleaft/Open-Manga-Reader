@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:uuid/uuid.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/widgets/alert_banner.dart';
@@ -6,6 +7,7 @@ import '../../../core/network/api_config.dart';
 import '../../../core/config/app_config.dart';
 import '../../../core/di/injection.dart';
 import '../../../core/network/manga_api_service.dart';
+import '../../../routes/app_pages.dart';
 
 class BaseApiSettingScreen extends StatefulWidget {
   const BaseApiSettingScreen({super.key});
@@ -34,6 +36,9 @@ class _BaseApiSettingScreenState extends State<BaseApiSettingScreen> {
       if (_activeConfig == null && _apiConfigs.isNotEmpty) {
         _activeConfig = _apiConfigs.first;
         await ApiConfigManager.setActiveApiId(_activeConfig!.id);
+        await AppConfig.updateBaseUrl(_activeConfig!.baseUrl);
+        final apiService = getIt<MangaApiService>();
+        apiService.updateBaseUrl(_activeConfig!.baseUrl);
       }
 
       if (_apiConfigs.isEmpty) {
@@ -58,8 +63,14 @@ class _BaseApiSettingScreenState extends State<BaseApiSettingScreen> {
         onSave: (config) async {
           if (existingConfig == null) {
             await ApiConfigManager.addApiConfig(config);
+            if (_apiConfigs.isEmpty || _activeConfig == null) {
+              await _setActiveApi(config);
+            }
           } else {
             await ApiConfigManager.updateApiConfig(config);
+            if (_activeConfig?.id == config.id) {
+              await _setActiveApi(config);
+            }
           }
           await _loadApiConfigs();
         },
@@ -87,8 +98,96 @@ class _BaseApiSettingScreenState extends State<BaseApiSettingScreen> {
   }
 
   Future<void> _deleteApi(ApiConfig config) async {
-    await ApiConfigManager.deleteApiConfig(config.id);
-    await _loadApiConfigs();
+    // Safeguard: must have at least 1 active API
+    if (_apiConfigs.length <= 1) {
+      if (mounted) {
+        AlertBanner.show(
+          context,
+          'At least 1 active API is required. You cannot delete this API.',
+          type: AlertBannerType.warning,
+        );
+      }
+      return;
+    }
+
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text('Delete API Configuration'),
+        content: Text('Are you sure you want to delete "${config.name}"?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red,
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm != true) return;
+
+    final wasActive = _activeConfig?.id == config.id;
+    try {
+      await ApiConfigManager.deleteApiConfig(config.id);
+      await _loadApiConfigs();
+
+      if (wasActive && _activeConfig != null) {
+        await AppConfig.updateBaseUrl(_activeConfig!.baseUrl);
+        final apiService = getIt<MangaApiService>();
+        apiService.updateBaseUrl(_activeConfig!.baseUrl);
+      }
+
+      if (mounted) {
+        AlertBanner.show(
+          context,
+          'API "${config.name}" deleted successfully',
+          type: AlertBannerType.info,
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        AlertBanner.show(
+          context,
+          'Failed to delete API: $e',
+          type: AlertBannerType.error,
+        );
+      }
+    }
+  }
+
+  void _navigateBackOrRoot() {
+    if (Navigator.canPop(context)) {
+      Navigator.pop(context);
+    } else {
+      final user = FirebaseAuth.instance.currentUser;
+      if (user != null && _activeConfig != null) {
+        Navigator.pushReplacementNamed(context, AppRoutes.home);
+      } else {
+        Navigator.pushReplacementNamed(context, AppRoutes.login);
+      }
+    }
+  }
+
+  void _navigateAfterSave() {
+    if (Navigator.canPop(context)) {
+      Navigator.pop(context, true);
+    } else {
+      final user = FirebaseAuth.instance.currentUser;
+      if (user != null) {
+        Navigator.pushReplacementNamed(context, AppRoutes.home);
+      } else {
+        Navigator.pushReplacementNamed(context, AppRoutes.login);
+      }
+    }
   }
 
   Future<void> _saveSettings() async {
@@ -103,7 +202,15 @@ class _BaseApiSettingScreenState extends State<BaseApiSettingScreen> {
           'API Configuration Saved',
           type: AlertBannerType.success,
         );
-        Navigator.pop(context);
+        _navigateAfterSave();
+      }
+    } else {
+      if (mounted) {
+        AlertBanner.show(
+          context,
+          'At least 1 active API is required. Please add or select an API.',
+          type: AlertBannerType.warning,
+        );
       }
     }
   }
@@ -115,34 +222,50 @@ class _BaseApiSettingScreenState extends State<BaseApiSettingScreen> {
         ? AppColors.backgroundDark
         : AppColors.backgroundLight;
 
-    return Scaffold(
-      backgroundColor: bgColor,
-      appBar: AppBar(
+    return PopScope(
+      canPop: Navigator.canPop(context),
+      onPopInvokedWithResult: (didPop, result) {
+        if (!didPop) {
+          _navigateBackOrRoot();
+        }
+      },
+      child: Scaffold(
         backgroundColor: bgColor,
-        title: const Text('Base API Setting'),
-        actions: [
-          TextButton(
-            onPressed: () {
-              _saveSettings();
-            },
-            style: TextButton.styleFrom(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(20),
+        appBar: AppBar(
+          backgroundColor: bgColor,
+          leading: Navigator.canPop(context)
+              ? null
+              : IconButton(
+                  icon: const Icon(Icons.arrow_back),
+                  onPressed: _navigateBackOrRoot,
+                ),
+          title: const Text('Base API Setting'),
+          actions: [
+            TextButton(
+              onPressed: () {
+                _saveSettings();
+              },
+              style: TextButton.styleFrom(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 8,
+                ),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(20),
+                ),
+              ),
+              child: Text(
+                'Save',
+                style: TextStyle(
+                  color: AppColors.primary,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 16,
+                ),
               ),
             ),
-            child: Text(
-              'Save',
-              style: TextStyle(
-                color: AppColors.primary,
-                fontWeight: FontWeight.bold,
-                fontSize: 16,
-              ),
-            ),
-          ),
-          const SizedBox(width: 8),
-        ],
-      ),
+            const SizedBox(width: 8),
+          ],
+        ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : SingleChildScrollView(
@@ -260,6 +383,7 @@ class _BaseApiSettingScreenState extends State<BaseApiSettingScreen> {
                 ],
               ),
             ),
+      ),
     );
   }
 
@@ -367,10 +491,11 @@ class _BaseApiSettingScreenState extends State<BaseApiSettingScreen> {
                       borderRadius: BorderRadius.circular(8),
                     ),
                   ),
-                  child: const Text(
+                  child: Text(
                     'Delete',
                     style: TextStyle(
-                      color: Colors.red,
+                      color:
+                          _apiConfigs.length <= 1 ? Colors.grey : Colors.red,
                       fontWeight: FontWeight.bold,
                     ),
                   ),
@@ -541,10 +666,11 @@ class _BaseApiSettingScreenState extends State<BaseApiSettingScreen> {
                         borderRadius: BorderRadius.circular(6),
                       ),
                     ),
-                    child: const Text(
+                    child: Text(
                       'Delete',
                       style: TextStyle(
-                        color: Colors.red,
+                        color:
+                            _apiConfigs.length <= 1 ? Colors.grey : Colors.red,
                         fontWeight: FontWeight.bold,
                       ),
                     ),

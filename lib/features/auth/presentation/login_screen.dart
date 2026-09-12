@@ -26,8 +26,13 @@ class _LoginScreenState extends State<LoginScreen> {
   Future<void> _checkApiConfig() async {
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       final activeConfig = await ApiConfigManager.getActiveApiConfig();
-      if (activeConfig == null) {
+      if (activeConfig == null || activeConfig.baseUrl.trim().isEmpty) {
         if (mounted) {
+          AlertBanner.show(
+            context,
+            'Please configure an API server first.',
+            type: AlertBannerType.info,
+          );
           Navigator.pushNamed(context, AppRoutes.baseApiSetting);
         }
       }
@@ -36,6 +41,23 @@ class _LoginScreenState extends State<LoginScreen> {
 
   Future<void> _handleGoogleSignIn() async {
     if (_isLoading) return;
+
+    // Block sign in if Base API is not configured
+    final activeConfig = await ApiConfigManager.getActiveApiConfig();
+    final configs = await ApiConfigManager.loadApiConfigs();
+    if (activeConfig == null ||
+        configs.isEmpty ||
+        activeConfig.baseUrl.trim().isEmpty) {
+      if (mounted) {
+        AlertBanner.show(
+          context,
+          'Base API is not configured. Please set up an API server first.',
+          type: AlertBannerType.warning,
+        );
+        Navigator.pushNamed(context, AppRoutes.baseApiSetting);
+      }
+      return;
+    }
 
     setState(() {
       _isLoading = true;
