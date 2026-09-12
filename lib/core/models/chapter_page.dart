@@ -3,12 +3,14 @@ class ChapterPage {
   final int width;
   final int height;
   final String? alternateUrl;
+  final bool isFallback;
 
   const ChapterPage({
     required this.url,
     this.width = 0,
     this.height = 0,
     this.alternateUrl,
+    this.isFallback = false,
   });
 
   /// The aspect ratio (height / width) of the page image, or null if dimensions are unknown.
@@ -43,6 +45,7 @@ class ChapterPage {
       width: width,
       height: height,
       alternateUrl: map['alternateUrl'] as String?,
+      isFallback: map['isFallback'] as bool? ?? false,
     );
   }
 
@@ -51,12 +54,14 @@ class ChapterPage {
     int? width,
     int? height,
     String? alternateUrl,
+    bool? isFallback,
   }) {
     return ChapterPage(
       url: url ?? this.url,
       width: width ?? this.width,
       height: height ?? this.height,
       alternateUrl: alternateUrl ?? this.alternateUrl,
+      isFallback: isFallback ?? this.isFallback,
     );
   }
 
@@ -66,12 +71,13 @@ class ChapterPage {
       'width': width,
       'height': height,
       if (alternateUrl != null) 'alternateUrl': alternateUrl,
+      'isFallback': isFallback,
     };
   }
 
   @override
   String toString() =>
-      'ChapterPage(url: $url, width: $width, height: $height, alternateUrl: $alternateUrl)';
+      'ChapterPage(url: $url, width: $width, height: $height, alternateUrl: $alternateUrl, isFallback: $isFallback)';
 
   @override
   bool operator ==(Object other) {
@@ -80,9 +86,10 @@ class ChapterPage {
         other.url == url &&
         other.width == width &&
         other.height == height &&
-        other.alternateUrl == alternateUrl;
+        other.alternateUrl == alternateUrl &&
+        other.isFallback == isFallback;
   }
 
   @override
-  int get hashCode => Object.hash(url, width, height, alternateUrl);
+  int get hashCode => Object.hash(url, width, height, alternateUrl, isFallback);
 }

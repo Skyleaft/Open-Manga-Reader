@@ -84,6 +84,7 @@ void main() {
         width: 1080,
         height: 1920,
         alternateUrl: 'https://alt.com/p.jpg',
+        isFallback: true,
       );
 
       final map = original.toMap();
@@ -91,10 +92,12 @@ void main() {
       expect(map['width'], 1080);
       expect(map['height'], 1920);
       expect(map['alternateUrl'], 'https://alt.com/p.jpg');
+      expect(map['isFallback'], isTrue);
 
       final deserialized = ChapterPage.fromMap(map);
       expect(deserialized, equals(original));
       expect(deserialized.hashCode, equals(original.hashCode));
+      expect(deserialized.isFallback, isTrue);
     });
 
     test('copyWith produces updated clone', () {
@@ -104,11 +107,16 @@ void main() {
         height: 200,
       );
 
-      final updated = page.copyWith(height: 300, alternateUrl: 'https://alt.com');
+      final updated = page.copyWith(
+        height: 300,
+        alternateUrl: 'https://alt.com',
+        isFallback: true,
+      );
       expect(updated.url, 'https://example.com/1.jpg');
       expect(updated.width, 100);
       expect(updated.height, 300);
       expect(updated.alternateUrl, 'https://alt.com');
+      expect(updated.isFallback, isTrue);
     });
   });
 }
