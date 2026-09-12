@@ -5,7 +5,9 @@ import '../../../core/di/injection.dart';
 import '../../../core/network/manga_api_service.dart';
 import '../../../core/services/network_status_service.dart';
 import '../../../core/widgets/alert_banner.dart';
+import '../../../core/models/chapter_page.dart';
 import '../../../routes/app_pages.dart';
+import '../../download/services/download_service.dart';
 import '../../manga_detail/models/manga_detail.dart';
 import '../../manga_detail/services/manga_detail_service.dart';
 import '../../manga_detail/presentation/widgets/status_selection_sheet.dart';
@@ -200,7 +202,19 @@ class _LibraryScreenState extends State<LibraryScreen>
         ),
       );
 
-      final pages = await _apiService.getChapterPages(manga.id, chapterToRead.id);
+      final downloadService = getIt<DownloadService>();
+      final downloaded = downloadService.getDownloadedChapter(manga.id, chapterToRead.id);
+      List<ChapterPage> pages;
+      if (downloaded != null && downloaded.isComplete) {
+        pages = downloaded.toChapterPages();
+      } else {
+        final fetched = await _apiService.getChapterPages(manga.id, chapterToRead.id);
+        pages = fetched
+            .map((p) => p.copyWith(
+                  url: _apiService.getLocalImageUrl(p.url, null),
+                ))
+            .toList();
+      }
 
       if (!mounted) return;
       Navigator.pop(context);
@@ -212,11 +226,7 @@ class _LibraryScreenState extends State<LibraryScreen>
         chapterId: chapterToRead.id,
         allChapters: detail.chapters,
         chapterTitle: chapterToRead.title,
-        pages: pages
-            .map((p) => p.copyWith(
-                  url: _apiService.getLocalImageUrl(p.url, null),
-                ))
-            .toList(),
+        pages: pages,
         currentPage: manga.currentPage > 1 ? manga.currentPage : 1,
       );
 

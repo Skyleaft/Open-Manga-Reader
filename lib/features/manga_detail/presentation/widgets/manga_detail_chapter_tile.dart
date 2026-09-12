@@ -3,11 +3,15 @@ import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import 'package:cached_network_image_ce/cached_network_image.dart';
 import 'package:google_fonts/google_fonts.dart';
+import '../../../../core/di/injection.dart';
 import '../../../../core/utils/formatters.dart';
+import '../../../download/models/downloaded_chapter.dart';
+import '../../../download/services/download_service.dart';
 import '../../../history/models/progression.dart';
 import '../../models/manga_detail.dart';
 
 class MangaDetailChapterTile extends StatelessWidget {
+  final MangaDetail? manga;
   final Chapter chapter;
   final bool isDark;
   final UserChapterLog? log;
@@ -15,6 +19,7 @@ class MangaDetailChapterTile extends StatelessWidget {
 
   const MangaDetailChapterTile({
     super.key,
+    this.manga,
     required this.chapter,
     required this.isDark,
     this.log,
@@ -308,6 +313,7 @@ class MangaDetailChapterTile extends StatelessWidget {
                   Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
+                      _buildDownloadButton(context, isDark, isAvailable),
                       _buildCompletionBadge(
                           context, isCompleted, isCurrentlyReading, log),
                       const SizedBox(width: 4),
@@ -445,6 +451,251 @@ class MangaDetailChapterTile extends StatelessWidget {
           ],
         ),
       ],
+    );
+  }
+
+  Widget _buildDownloadButton(
+    BuildContext context,
+    bool isDark,
+    bool isAvailable,
+  ) {
+    if (manga == null || !getIt.isRegistered<DownloadService>()) {
+      return const SizedBox.shrink();
+    }
+
+    final downloadService = getIt<DownloadService>();
+
+    return ValueListenableBuilder<Map<String, DownloadTask>>(
+      valueListenable: downloadService.tasksNotifier,
+      builder: (context, tasks, _) {
+        final task = tasks[chapter.id];
+        final isDownloaded =
+            downloadService.isChapterDownloaded(manga!.id, chapter.id);
+
+        if (task != null && task.isDownloading) {
+          final progress = task.progress;
+          return Padding(
+            padding: const EdgeInsets.only(right: 6),
+            child: SizedBox(
+              width: 30,
+              height: 30,
+              child: IconButton(
+                padding: EdgeInsets.zero,
+                tooltip:
+                    'Downloading ${(progress * 100).toInt()}% (Tap to cancel)',
+                onPressed: () =>
+                    _confirmCancelDownload(context, downloadService),
+                icon: Stack(
+                  alignment: Alignment.center,
+                  children: [
+                    SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(
+                        value: progress > 0 ? progress : null,
+                        strokeWidth: 2.2,
+                        valueColor: AlwaysStoppedAnimation<Color>(
+                          Theme.of(context).colorScheme.primary,
+                        ),
+                      ),
+                    ),
+                    const Icon(Icons.close_rounded, size: 10),
+                  ],
+                ),
+              ),
+            ),
+          );
+        }
+
+        if (task != null && task.isQueued) {
+          return Padding(
+            padding: const EdgeInsets.only(right: 6),
+            child: SizedBox(
+              width: 30,
+              height: 30,
+              child: IconButton(
+                padding: EdgeInsets.zero,
+                tooltip: 'Queued (Tap to cancel)',
+                onPressed: () =>
+                    _confirmCancelDownload(context, downloadService),
+                icon: const Icon(
+                  Icons.hourglass_top_rounded,
+                  color: Colors.amber,
+                  size: 18,
+                ),
+              ),
+            ),
+          );
+        }
+
+        if (isDownloaded) {
+          return Padding(
+            padding: const EdgeInsets.only(right: 6),
+            child: SizedBox(
+              width: 30,
+              height: 30,
+              child: IconButton(
+                padding: EdgeInsets.zero,
+                tooltip: 'Downloaded (Tap for options)',
+                onPressed: () =>
+                    _showDownloadedOptions(context, downloadService),
+                icon: const Icon(
+                  Icons.offline_pin_rounded,
+                  color: Color(0xFF10B981),
+                  size: 20,
+                ),
+              ),
+            ),
+          );
+        }
+
+        return Padding(
+          padding: const EdgeInsets.only(right: 4),
+          child: SizedBox(
+            width: 30,
+            height: 30,
+            child: IconButton(
+              padding: EdgeInsets.zero,
+              tooltip: 'Download chapter',
+              onPressed: isAvailable
+                  ? () {
+                      HapticFeedback.selectionClick();
+                      downloadService.downloadChapter(manga!, chapter);
+                    }
+                  : null,
+              icon: Icon(
+                Icons.download_for_offline_outlined,
+                color: isDark ? Colors.white38 : Colors.black38,
+                size: 20,
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  void _confirmCancelDownload(
+    BuildContext context,
+    DownloadService downloadService,
+  ) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Cancel Download'),
+        content: Text(
+          'Cancel downloading Chapter ${chapter.chapterNumber % 1 == 0 ? chapter.chapterNumber.toInt() : chapter.chapterNumber}?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('No'),
+          ),
+          FilledButton(
+            onPressed: () {
+              downloadService.cancelDownload(chapter.id);
+              Navigator.pop(ctx);
+            },
+            child: const Text('Cancel Download'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showDownloadedOptions(
+    BuildContext context,
+    DownloadService downloadService,
+  ) {
+    final downloaded =
+        downloadService.getDownloadedChapter(manga!.id, chapter.id);
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) {
+        final theme = Theme.of(ctx);
+        final isDark = theme.brightness == Brightness.dark;
+        return Container(
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            color: isDark ? const Color(0xFF1E293B) : Colors.white,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Row(
+                children: [
+                  const Icon(
+                    Icons.offline_pin_rounded,
+                    color: Color(0xFF10B981),
+                    size: 26,
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      chapter.title.isNotEmpty
+                          ? chapter.title
+                          : 'Chapter ${chapter.chapterNumber % 1 == 0 ? chapter.chapterNumber.toInt() : chapter.chapterNumber}',
+                      style: GoogleFonts.inter(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              if (downloaded != null)
+                Text(
+                  'Downloaded ${downloaded.pageCount} pages (${downloaded.formattedSize}) on ${DateFormat("MMM dd, yyyy").format(downloaded.downloadedAt)}',
+                  style: GoogleFonts.inter(
+                    fontSize: 13,
+                    color: isDark ? Colors.white60 : Colors.black54,
+                  ),
+                ),
+              const SizedBox(height: 20),
+              ElevatedButton.icon(
+                onPressed: () {
+                  Navigator.pop(ctx);
+                  onTap?.call();
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: theme.colorScheme.primary,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+                icon: const Icon(Icons.chrome_reader_mode_rounded),
+                label: const Text('Read Offline Now'),
+              ),
+              const SizedBox(height: 8),
+              OutlinedButton.icon(
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: Colors.redAccent,
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+                onPressed: () async {
+                  await downloadService.deleteDownloadedChapter(
+                    manga!.id,
+                    chapter.id,
+                  );
+                  if (ctx.mounted) Navigator.pop(ctx);
+                },
+                icon: const Icon(Icons.delete_outline_rounded),
+                label: const Text('Delete Download'),
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
 }

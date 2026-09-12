@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:cached_network_image_ce/cached_network_image.dart';
@@ -246,6 +247,51 @@ class _AppNetworkImageState extends State<AppNetworkImage> {
   @override
   Widget build(BuildContext context) {
     final url = _effectiveImageUrl;
+
+    final bool isLocalFile =
+        !url.startsWith('http://') && !url.startsWith('https://');
+    if (isLocalFile) {
+      final file = File(url);
+      final fileWidget = Image.file(
+        file,
+        key: _imageKey,
+        fit: widget.fit,
+        width: widget.width,
+        height: widget.height,
+        gaplessPlayback: widget.gaplessPlayback,
+        frameBuilder: (context, child, frame, wasSynchronouslyLoaded) {
+          if (frame != null &&
+              !_aspectRatioReported &&
+              widget.onAspectRatioResolved != null) {
+            final stream = FileImage(file).resolve(const ImageConfiguration());
+            late final ImageStreamListener listener;
+            listener = ImageStreamListener(
+              (info, _) {
+                final w = info.image.width;
+                final h = info.image.height;
+                if (w > 0 && mounted && !_aspectRatioReported) {
+                  _aspectRatioReported = true;
+                  widget.onAspectRatioResolved?.call(h / w);
+                }
+                stream.removeListener(listener);
+              },
+              onError: (_, _) {
+                stream.removeListener(listener);
+              },
+            );
+            stream.addListener(listener);
+          }
+          return child;
+        },
+        errorBuilder: (context, error, stackTrace) {
+          if (kDebugMode) {
+            debugPrint('🖼️ [LOCAL IMAGE ERR] $url -> Error: $error');
+          }
+          return _buildErrorWidget();
+        },
+      );
+      return _wrapDebugLabel(fileWidget);
+    }
 
     if (_isAvifFallback) {
       final avifWidget = CachedNetworkAvifImage(

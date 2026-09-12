@@ -4,6 +4,7 @@ import 'package:google_fonts/google_fonts.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/di/injection.dart';
 import '../../../core/widgets/alert_banner.dart';
+import '../../../routes/app_pages.dart';
 import '../services/storage_service.dart';
 
 class StorageSettingScreen extends StatefulWidget {
@@ -95,99 +96,12 @@ class _StorageSettingScreenState extends State<StorageSettingScreen> {
     }
   }
 
-  void _showDownloadsInfoDialog() {
+  Future<void> _openDownloadsManager() async {
     HapticFeedback.selectionClick();
-    showDialog(
-      context: context,
-      builder: (context) {
-        final theme = Theme.of(context);
-        final isDark = theme.brightness == Brightness.dark;
-        return AlertDialog(
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(24),
-          ),
-          title: Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: theme.colorScheme.primary.withValues(alpha: 0.15),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Icon(
-                  Icons.download_rounded,
-                  color: theme.colorScheme.primary,
-                  size: 24,
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Text(
-                  'Offline Downloads',
-                  style: GoogleFonts.inter(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 18,
-                  ),
-                ),
-              ),
-            ],
-          ),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Chapter download feature is currently under active development. In an upcoming update, you will be able to download full manga chapters for smooth offline reading on the go!',
-                style: GoogleFonts.inter(
-                  color: isDark ? Colors.white70 : const Color(0xFF475569),
-                  fontSize: 14,
-                  height: 1.5,
-                ),
-              ),
-              const SizedBox(height: 16),
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: isDark
-                      ? const Color(0xFF1E293B)
-                      : theme.colorScheme.primary.withValues(alpha: 0.08),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(
-                    color: theme.colorScheme.primary.withValues(alpha: 0.2),
-                  ),
-                ),
-                child: Row(
-                  children: [
-                    Icon(
-                      Icons.auto_awesome_rounded,
-                      color: theme.colorScheme.primary,
-                      size: 20,
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Text(
-                        'Storage management is already configured and ready for downloaded packages.',
-                        style: GoogleFonts.inter(
-                          fontSize: 12.5,
-                          fontWeight: FontWeight.w500,
-                          color: isDark ? Colors.white70 : Colors.black87,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Got it'),
-            ),
-          ],
-        );
-      },
-    );
+    await Navigator.pushNamed(context, AppRoutes.downloadedChapters);
+    if (mounted) {
+      _loadStorageUsage();
+    }
   }
 
   @override
@@ -398,18 +312,21 @@ class _StorageSettingScreenState extends State<StorageSettingScreen> {
               subtitle:
                   'Offline saved chapters and volume bundles for reading without internet.',
               sizeString: StorageService.formatBytes(downloadsBytes),
-              badgeText: 'Coming Soon',
-              trailingButton: OutlinedButton(
-                onPressed: _showDownloadsInfoDialog,
-                style: OutlinedButton.styleFrom(
+              trailingButton: ElevatedButton(
+                onPressed: _openDownloadsManager,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor:
+                      const Color(0xFF10B981).withValues(alpha: 0.12),
+                  foregroundColor: const Color(0xFF10B981),
+                  elevation: 0,
                   padding:
-                      const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(10),
                   ),
                 ),
                 child: const Text(
-                  'Info',
+                  'Manage',
                   style: TextStyle(
                     fontWeight: FontWeight.bold,
                     fontSize: 13,
