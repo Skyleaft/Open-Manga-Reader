@@ -12,6 +12,7 @@ import '../models/chapter_scraping_progress.dart';
 import '../models/manga_detail.dart';
 import '../services/manga_detail_service.dart';
 import '../services/manga_signalr_service.dart';
+import '../../../core/services/network_status_service.dart';
 
 enum ChapterFilterOption {
   all,
@@ -153,7 +154,11 @@ class MangaDetailController extends ChangeNotifier {
 
     // 2. Defer heavy background sync & SignalR connection until after page transition completes
     Future.delayed(const Duration(milliseconds: 180), () {
-      _initSignalR();
+      final isOffline = getIt.isRegistered<NetworkStatusService>() &&
+          !getIt<NetworkStatusService>().isOnline;
+      if (!isOffline) {
+        _initSignalR();
+      }
       _loadChapters();
     });
   }
@@ -398,6 +403,14 @@ class MangaDetailController extends ChangeNotifier {
         _isLoadingChapters = false;
         notifyListeners();
       }
+    }
+
+    final isOffline = getIt.isRegistered<NetworkStatusService>() &&
+        !getIt<NetworkStatusService>().isOnline;
+    if (isOffline) {
+      _isLoadingChapters = false;
+      notifyListeners();
+      return;
     }
 
     final isStale = await _detailService.isCacheStale(manga.id);

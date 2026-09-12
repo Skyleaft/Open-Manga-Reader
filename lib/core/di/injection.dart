@@ -6,7 +6,9 @@ import '../services/heartbeat_service.dart';
 import '../services/notification_service.dart';
 import '../services/window_service.dart';
 import '../theme/theme_provider.dart';
+import '../services/network_status_service.dart';
 import '../../features/history/services/progression_service.dart';
+import '../../features/library/services/library_cache_service.dart';
 import '../../features/library/services/library_service.dart';
 import '../../features/manga_detail/services/manga_detail_service.dart';
 import '../../features/manga_detail/services/manga_signalr_service.dart';
@@ -19,6 +21,10 @@ Future<void> setupInjection() async {
   final themeProvider = ThemeProvider();
   await themeProvider.init();
   getIt.registerSingleton<ThemeProvider>(themeProvider);
+
+  final networkStatusService = NetworkStatusService();
+  await networkStatusService.init();
+  getIt.registerSingleton<NetworkStatusService>(networkStatusService);
 
   final mangaApiService = MangaApiService();
   await mangaApiService.init();
@@ -40,8 +46,9 @@ Future<void> setupInjection() async {
 
   getIt.registerLazySingleton<SyncService>(() => SyncService());
   getIt.registerLazySingleton<ProgressionService>(() => ProgressionService());
-  getIt.registerLazySingleton<LibraryService>(() => LibraryService());
   getIt.registerLazySingleton<MangaDetailService>(() => MangaDetailService());
+  getIt.registerLazySingleton<LibraryCacheService>(() => LibraryCacheService());
+  getIt.registerLazySingleton<LibraryService>(() => LibraryService());
   getIt.registerLazySingleton<StorageService>(() => StorageService());
 }
 
