@@ -259,6 +259,8 @@ class Chapter {
   final List<ChapterPage> pages;
   final String language;
   final int totalView;
+  final int totalPages;
+  final int brokenPageCount;
 
   Chapter({
     required this.id,
@@ -274,9 +276,12 @@ class Chapter {
     this.pages = const [],
     this.language = '',
     this.totalView = 0,
+    this.totalPages = 0,
+    this.brokenPageCount = 0,
   });
 
   List<String> get pageUrls => pages.map((p) => p.url).toList();
+  int get pageCount => totalPages > 0 ? totalPages : pages.length;
 
   Chapter copyWith({
     String? id,
@@ -292,6 +297,8 @@ class Chapter {
     List<ChapterPage>? pages,
     String? language,
     int? totalView,
+    int? totalPages,
+    int? brokenPageCount,
   }) {
     return Chapter(
       id: id ?? this.id,
@@ -307,6 +314,8 @@ class Chapter {
       pages: pages ?? this.pages,
       language: language ?? this.language,
       totalView: totalView ?? this.totalView,
+      totalPages: totalPages ?? this.totalPages,
+      brokenPageCount: brokenPageCount ?? this.brokenPageCount,
     );
   }
 
@@ -317,6 +326,13 @@ class Chapter {
             .toList() ??
         [];
     final numVal = map['number'] ?? map['chapterNumber'] ?? 0;
+    final int totalPages = (map['totalPages'] is num)
+        ? (map['totalPages'] as num).toInt()
+        : int.tryParse(map['totalPages']?.toString() ?? '') ?? pagesList.length;
+    final int brokenPageCount = (map['brokenPageCount'] is num)
+        ? (map['brokenPageCount'] as num).toInt()
+        : int.tryParse(map['brokenPageCount']?.toString() ?? '') ?? 0;
+
     return Chapter(
       id: map['id'] as String? ?? (numVal.toString()),
       title: map['title'] as String? ?? 'Chapter $numVal',
@@ -328,14 +344,16 @@ class Chapter {
           : DateTime.now(),
       isNew: map['isNew'] as bool? ?? false,
       isRead: map['isRead'] as bool? ?? false,
-      isChapterAvailable:
-          map['isChapterAvailable'] as bool? ?? pagesList.isNotEmpty,
+      isChapterAvailable: map['isChapterAvailable'] as bool? ??
+          (totalPages > 0 || pagesList.isNotEmpty),
       chapterProvider: map['chapterProvider'] as String?,
       chapterProviderIcon: map['chapterProviderIcon'] as String?,
       link: map['link'] as String?,
       pages: pagesList,
       language: map['language'] as String? ?? '',
       totalView: map['totalView'] as int? ?? 0,
+      totalPages: totalPages,
+      brokenPageCount: brokenPageCount,
     );
   }
 
@@ -356,6 +374,8 @@ class Chapter {
       'pages': pages.map((p) => p.toMap()).toList(),
       'language': language,
       'totalView': totalView,
+      'totalPages': totalPages,
+      'brokenPageCount': brokenPageCount,
     };
   }
 }

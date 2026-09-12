@@ -143,6 +143,8 @@ class LatestChapterSummary {
   final String? chapterProviderIcon;
   final DateTime uploadDate;
   final int totalView;
+  final int totalPages;
+  final int brokenPageCount;
 
   LatestChapterSummary({
     required this.id,
@@ -154,21 +156,32 @@ class LatestChapterSummary {
     this.chapterProviderIcon,
     required this.uploadDate,
     required this.totalView,
+    this.totalPages = 0,
+    this.brokenPageCount = 0,
   });
 
-  int get pageCount => pages.length;
-  bool get isChapterAvailable => pages.isNotEmpty || (link != null && link!.isNotEmpty);
+  int get pageCount => totalPages > 0 ? totalPages : pages.length;
+  bool get isChapterAvailable =>
+      totalPages > 0 || pages.isNotEmpty || (link != null && link!.isNotEmpty);
 
   factory LatestChapterSummary.fromJson(Map<String, dynamic> json) {
     final rawPages = json['pages'] as List<dynamic>?;
+    final pagesList = rawPages
+            ?.map((e) => e is Map ? (e['url']?.toString() ?? '') : e.toString())
+            .toList() ??
+        [];
+    final int totalPages = (json['totalPages'] is num)
+        ? (json['totalPages'] as num).toInt()
+        : int.tryParse(json['totalPages']?.toString() ?? '') ?? pagesList.length;
+    final int brokenPageCount = (json['brokenPageCount'] is num)
+        ? (json['brokenPageCount'] as num).toInt()
+        : int.tryParse(json['brokenPageCount']?.toString() ?? '') ?? 0;
+
     return LatestChapterSummary(
       id: json['id'] as String? ?? '',
       number: (json['number'] as num? ?? json['chapterNumber'] as num? ?? 0).toDouble(),
       link: json['link'] as String?,
-      pages: rawPages
-              ?.map((e) => e is Map ? (e['url']?.toString() ?? '') : e.toString())
-              .toList() ??
-          [],
+      pages: pagesList,
       language: json['language'] as String? ?? '',
       chapterProvider: json['chapterProvider'] as String?,
       chapterProviderIcon: json['chapterProviderIcon'] as String?,
@@ -176,6 +189,8 @@ class LatestChapterSummary {
           ? (DateTime.tryParse(json['uploadDate'] as String) ?? DateTime.now())
           : DateTime.now(),
       totalView: json['totalView'] as int? ?? 0,
+      totalPages: totalPages,
+      brokenPageCount: brokenPageCount,
     );
   }
 
@@ -190,6 +205,8 @@ class LatestChapterSummary {
       'chapterProviderIcon': chapterProviderIcon,
       'uploadDate': uploadDate.toIso8601String(),
       'totalView': totalView,
+      'totalPages': totalPages,
+      'brokenPageCount': brokenPageCount,
     };
   }
 }

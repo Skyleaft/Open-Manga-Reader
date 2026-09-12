@@ -24,6 +24,14 @@ class FakeCacheManager implements BaseCacheManager {
   }
 
   @override
+  Future<FileInfo?> getFileFromCache(
+    String key, {
+    bool ignoreMemCache = false,
+  }) async {
+    return null;
+  }
+
+  @override
   dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }
 
@@ -110,6 +118,16 @@ void main() {
       expect(fakeDetailService.stored['manga-1']!.title, 'Solo Leveling');
       expect(fakeDetailService.stored['manga-1']!.chapters.length, 1);
       expect(service.progress, 1.0);
+      expect(service.lastFullCacheTime, isNotNull);
+
+      // Second call immediately should be skipped due to cooldown
+      fakeCache.downloadedUrls.clear();
+      await service.cacheAllLibraryData([manga]);
+      expect(fakeCache.downloadedUrls, isEmpty);
+
+      // Unless force: true
+      await service.cacheAllLibraryData([manga], force: true);
+      expect(fakeCache.downloadedUrls, contains('https://cdn.example.com/covers/sl.jpg'));
     });
   });
 }

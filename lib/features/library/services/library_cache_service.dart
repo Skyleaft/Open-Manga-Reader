@@ -19,10 +19,16 @@ class LibraryCacheService {
   bool get isCaching => isCachingNotifier.value;
   double get progress => progressNotifier.value;
 
+  final Duration cooldownDuration;
+  DateTime? _lastFullCacheTime;
+
+  DateTime? get lastFullCacheTime => _lastFullCacheTime;
+
   LibraryCacheService({
     MangaApiService? apiService,
     MangaDetailService? detailService,
     BaseCacheManager? cacheManager,
+    this.cooldownDuration = const Duration(hours: 6),
   })  : _apiService = apiService ?? getIt<MangaApiService>(),
         _detailService = detailService ?? getIt<MangaDetailService>(),
         _cacheManager = cacheManager ?? DefaultCacheManager();
@@ -30,8 +36,21 @@ class LibraryCacheService {
   bool _cancelRequested = false;
 
   /// Caches all covers and full manga details for the given [library] mangas.
-  Future<void> cacheAllLibraryData(List<LibraryManga> library) async {
+  Future<void> cacheAllLibraryData(
+    List<LibraryManga> library, {
+    bool force = false,
+  }) async {
     if (library.isEmpty || isCaching) return;
+
+    // Skip if within cooldown period unless forced
+    if (!force &&
+        _lastFullCacheTime != null &&
+        DateTime.now().difference(_lastFullCacheTime!) < cooldownDuration) {
+      debugPrint(
+        '[LibraryCacheService] Pre-cache cooldown active (last run: ${_lastFullCacheTime!.toIso8601String()}), skipping.',
+      );
+      return;
+    }
 
     // Skip if offline
     if (getIt.isRegistered<NetworkStatusService>() &&
@@ -65,9 +84,15 @@ class LibraryCacheService {
 
       completed++;
       progressNotifier.value = completed / total;
+
+      // Rate limit protection: small pause between items
+      if (completed < total) {
+        await Future.delayed(const Duration(milliseconds: 50));
+      }
     }
 
     isCachingNotifier.value = false;
+    _lastFullCacheTime = DateTime.now();
     debugPrint(
       '[LibraryCacheService] Pre-cache completed ($completed/$total processed)',
     );
@@ -133,6 +158,10 @@ class LibraryCacheService {
     try {
       final fullUrl = _apiService.getLocalImageUrl(imagePath, imagePath);
       if (fullUrl.isNotEmpty && fullUrl.startsWith('http')) {
+        final existing = await _cacheManager.getFileFromCache(fullUrl);
+        if (existing != null && await existing.file.exists()) {
+          return;
+        }
         await _cacheManager.getSingleFile(fullUrl);
       }
     } catch (e) {

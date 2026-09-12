@@ -2323,7 +2323,6 @@ components:
         - id
         - number
         - link
-        - pages
         - language
         - chapterProvider
         - chapterProviderIcon
@@ -2344,10 +2343,6 @@ components:
           type:
             - "null"
             - string
-        pages:
-          type: array
-          items:
-            $ref: "#/components/schemas/ChapterPageResponse"
         language:
           type: string
         chapterProvider:
@@ -2367,6 +2362,26 @@ components:
             - integer
             - string
           format: int32
+        totalPages:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - integer
+            - string
+          format: int32
+          default: 0
+        brokenPageCount:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - integer
+            - string
+          format: int32
+          default: 0
+        pages:
+          type:
+            - "null"
+            - array
+          items:
+            $ref: "#/components/schemas/ChapterPageResponse"
     CreateOrUpdateRecurringJobCommand:
       required:
         - jobId

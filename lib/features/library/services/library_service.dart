@@ -129,9 +129,6 @@ class LibraryService {
     // 2. Sync with API only if forced or if cache is stale & empty
     if (forceSync || (isStale && localLibrary.isEmpty)) {
       _syncLibraryFromApi(apiService, syncService);
-    } else if (localLibrary.isNotEmpty) {
-      // Ensure any missing covers or details are pre-cached in background
-      getIt<LibraryCacheService>().cacheAllLibraryData(localLibrary);
     }
 
     return localLibrary;

@@ -242,6 +242,32 @@ class MangaDetailChapterTile extends StatelessWidget {
                                 ),
                               ],
                             ),
+
+                            // Page Count
+                            if (chapter.pageCount > 0)
+                              Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(
+                                    Icons.auto_stories_outlined,
+                                    color: isDark
+                                        ? Colors.white54
+                                        : Colors.black45,
+                                    size: 12,
+                                  ),
+                                  const SizedBox(width: 3),
+                                  Text(
+                                    '${chapter.pageCount} pgs',
+                                    style: GoogleFonts.inter(
+                                      color: isDark
+                                          ? Colors.white54
+                                          : Colors.black45,
+                                      fontSize: 9.5,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                ],
+                              ),
                           ],
                         ),
                         const SizedBox(height: 4),
