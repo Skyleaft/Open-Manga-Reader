@@ -6,6 +6,7 @@ import '../../../core/di/injection.dart';
 import '../../../core/models/chapter_page.dart';
 import '../../../core/network/manga_api_service.dart';
 import '../../../core/storage/hive_storage.dart';
+import '../../../core/utils/url_utils.dart';
 import '../../manga_detail/models/manga_detail.dart';
 import '../../settings/services/storage_service.dart';
 import '../models/downloaded_chapter.dart';
@@ -273,7 +274,10 @@ class DownloadService {
 
       // 2. Prepare directory
       final baseDir = await _storageService.getDownloadsDirectory();
-      final chapterDir = Directory('${baseDir.path}/$mangaId/$chapterId');
+      final chapterDirPath = UrlUtils.normalizeLocalFilePath(
+        '${baseDir.path}/$mangaId/$chapterId',
+      );
+      final chapterDir = Directory(chapterDirPath);
       if (!await chapterDir.exists()) {
         await chapterDir.create(recursive: true);
       }
@@ -293,7 +297,9 @@ class DownloadService {
         final page = pages[i];
         final ext = _getImageExtension(page.url);
         final fileName = '${(i + 1).toString().padLeft(3, '0')}$ext';
-        final filePath = '${chapterDir.path}/$fileName';
+        final filePath = UrlUtils.normalizeLocalFilePath(
+          '${chapterDir.path}/$fileName',
+        );
         final file = File(filePath);
 
         // Download or use existing if already on disk
@@ -437,7 +443,10 @@ class DownloadService {
 
     try {
       final baseDir = await _storageService.getDownloadsDirectory();
-      final chapterDir = Directory('${baseDir.path}/$mangaId/$chapterId');
+      final chapterDirPath = UrlUtils.normalizeLocalFilePath(
+        '${baseDir.path}/$mangaId/$chapterId',
+      );
+      final chapterDir = Directory(chapterDirPath);
       if (await chapterDir.exists()) {
         await chapterDir.delete(recursive: true);
       }
@@ -457,7 +466,10 @@ class DownloadService {
   Future<void> deleteMangaDownloads(String mangaId) async {
     try {
       final baseDir = await _storageService.getDownloadsDirectory();
-      final mangaDir = Directory('${baseDir.path}/$mangaId');
+      final mangaDirPath = UrlUtils.normalizeLocalFilePath(
+        '${baseDir.path}/$mangaId',
+      );
+      final mangaDir = Directory(mangaDirPath);
       if (await mangaDir.exists()) {
         await mangaDir.delete(recursive: true);
       }

@@ -248,10 +248,10 @@ class _AppNetworkImageState extends State<AppNetworkImage> {
   Widget build(BuildContext context) {
     final url = _effectiveImageUrl;
 
-    final bool isLocalFile =
-        !url.startsWith('http://') && !url.startsWith('https://');
+    final bool isLocalFile = UrlUtils.isLocalFilePath(url);
     if (isLocalFile) {
-      final file = File(url);
+      final normalizedPath = UrlUtils.normalizeLocalFilePath(url);
+      final file = File(normalizedPath);
       final fileWidget = Image.file(
         file,
         key: _imageKey,
