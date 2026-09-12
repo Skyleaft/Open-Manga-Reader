@@ -82,6 +82,11 @@ class ApiConfigManager {
     final configs = await loadApiConfigs();
     configs.add(config);
     await saveApiConfigs(configs);
+
+    final activeId = await getActiveApiId();
+    if (activeId == null || configs.length == 1) {
+      await setActiveApiId(config.id);
+    }
   }
 
   static Future<void> updateApiConfig(ApiConfig config) async {
@@ -95,6 +100,12 @@ class ApiConfigManager {
 
   static Future<void> deleteApiConfig(String apiId) async {
     final configs = await loadApiConfigs();
+    if (configs.length <= 1) {
+      throw StateError(
+        'Cannot delete the only API config. At least 1 active API is required.',
+      );
+    }
+
     configs.removeWhere((c) => c.id == apiId);
     await saveApiConfigs(configs);
 
@@ -105,13 +116,18 @@ class ApiConfigManager {
   }
 
   static Future<ApiConfig?> getActiveApiConfig() async {
-    final activeId = await getActiveApiId();
-    if (activeId == null) return null;
-
     final configs = await loadApiConfigs();
-    return configs.firstWhere(
-      (config) => config.id == activeId,
-      orElse: () => configs.first,
-    );
+    if (configs.isEmpty) return null;
+
+    final activeId = await getActiveApiId();
+    if (activeId != null) {
+      final matches = configs.where((config) => config.id == activeId);
+      if (matches.isNotEmpty) {
+        return matches.first;
+      }
+    }
+
+    await setActiveApiId(configs.first.id);
+    return configs.first;
   }
 }

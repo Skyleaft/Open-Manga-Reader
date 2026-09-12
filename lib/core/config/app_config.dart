@@ -1,4 +1,5 @@
 import 'package:shared_preferences/shared_preferences.dart';
+import '../network/api_config.dart';
 
 class AppConfig {
   static const String _defaultBaseUrl = String.fromEnvironment(
@@ -20,9 +21,15 @@ class AppConfig {
 
   static Future<void> init() async {
     try {
+      final activeConfig = await ApiConfigManager.getActiveApiConfig();
+      if (activeConfig != null && activeConfig.baseUrl.trim().isNotEmpty) {
+        baseUrl = activeConfig.baseUrl;
+        return;
+      }
+
       final prefs = await SharedPreferences.getInstance();
       final savedUrl = prefs.getString('api_base_url');
-      if (savedUrl != null) {
+      if (savedUrl != null && savedUrl.trim().isNotEmpty) {
         baseUrl = savedUrl;
       }
     } catch (e) {

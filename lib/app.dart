@@ -212,8 +212,11 @@ class _AuthWrapperState extends State<AuthWrapper> with ProtocolListener {
   Future<void> _checkApiConfiguration() async {
     try {
       final configs = await ApiConfigManager.loadApiConfigs();
+      final activeConfig = await ApiConfigManager.getActiveApiConfig();
 
-      if (configs.isEmpty) {
+      if (configs.isEmpty ||
+          activeConfig == null ||
+          activeConfig.baseUrl.trim().isEmpty) {
         if (mounted) {
           setState(() {
             _isCheckingAuth = false;
