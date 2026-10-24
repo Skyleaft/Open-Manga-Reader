@@ -46,11 +46,13 @@ Future<void> setupInjection() async {
   getIt.registerSingleton<MangaSignalRService>(signalRService);
 
   getIt.registerLazySingleton<SyncService>(() => SyncService());
-  getIt.registerLazySingleton<ProgressionService>(() => ProgressionService());
+  getIt.registerLazySingleton<LibraryService>(() => LibraryService());
   getIt.registerLazySingleton<MangaDetailService>(() => MangaDetailService());
   getIt.registerLazySingleton<LibraryCacheService>(() => LibraryCacheService());
-  getIt.registerLazySingleton<LibraryService>(() => LibraryService());
   getIt.registerLazySingleton<StorageService>(() => StorageService());
   getIt.registerLazySingleton<DownloadService>(() => DownloadService());
+
+  final progressionService = ProgressionService();
+  getIt.registerSingleton<ProgressionService>(progressionService);
 }
 

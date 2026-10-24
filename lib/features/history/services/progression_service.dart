@@ -1,9 +1,12 @@
+import 'dart:async';
 import 'package:flutter/foundation.dart';
 import '../../../core/storage/hive_storage.dart';
 import '../models/progression.dart';
 import '../../../core/di/injection.dart';
 import '../../../core/network/manga_api_service.dart';
 import '../../../core/network/sync_service.dart';
+import '../../library/services/library_service.dart';
+import '../../manga_detail/services/manga_signalr_service.dart';
 
 extension ListExtensions<T> on List<T> {
   T? firstWhereOrNull(bool Function(T element) test) {
@@ -27,8 +30,121 @@ class ProgressionService extends ChangeNotifier {
   DateTime? _lastSyncTime;
   bool _isSyncingAll = false;
   final Set<String> _syncingMangaIds = {};
+  StreamSubscription<Map<String, dynamic>>? _signalRSub;
 
   String get _currentUserId => getIt<MangaApiService>().userId ?? '';
+
+  ProgressionService() {
+    _initSignalRListener();
+  }
+
+  void _initSignalRListener() {
+    try {
+      final signalR = getIt<MangaSignalRService>();
+      _signalRSub = signalR.progressionUpdatedStream.listen(_onRemoteProgressionReceived);
+      if (_currentUserId.isNotEmpty) {
+        signalR.joinUserGroup(_currentUserId);
+      }
+    } catch (_) {}
+  }
+
+  void joinUserSignalRGroup([String? userId]) {
+    final uid = (userId != null && userId.isNotEmpty) ? userId : _currentUserId;
+    if (uid.isNotEmpty) {
+      try {
+        getIt<MangaSignalRService>().joinUserGroup(uid);
+      } catch (_) {}
+    }
+  }
+
+  Future<void> _onRemoteProgressionReceived(Map<String, dynamic> data) async {
+    try {
+      final targetUserId = data['userId']?.toString() ?? '';
+      if (_currentUserId.isNotEmpty && targetUserId.isNotEmpty && targetUserId != _currentUserId) {
+        return;
+      }
+
+      final mangaId = data['mangaId']?.toString() ?? '';
+      if (mangaId.isEmpty) return;
+
+      final chapterId = data['chapterId']?.toString() ?? '';
+      final chapterNumber = (data['chapterNumber'] as num?)?.toDouble() ?? 0.0;
+      final lastReadPage = (data['lastReadPage'] as num?)?.toInt() ?? 0;
+      final totalPages = (data['totalPages'] as num?)?.toInt() ?? 0;
+      final isCompleted = data['isCompleted'] == true;
+      final readingTimeSeconds = (data['readingTimeSeconds'] as num?)?.toInt() ?? 0;
+      final remoteLastReadAt = DateTime.tryParse(data['lastReadAt']?.toString() ?? '') ?? DateTime.now();
+
+      final syncService = getIt<SyncService>();
+      final isPendingSync = syncService
+          .getPendingMangaIdsForType('progression_update')
+          .contains(mangaId);
+
+      final localList = await _loadFromLocalCache();
+      final local = localList.firstWhereOrNull((p) => p.mangaId == mangaId);
+
+      // Conflict resolution: if local has newer offline progress pending sync, preserve local
+      if (local != null && local.lastReadAt.isAfter(remoteLastReadAt) && isPendingSync) {
+        return;
+      }
+
+      final newLog = UserChapterLog(
+        id: '',
+        chapterId: chapterId,
+        chapterNumber: chapterNumber,
+        lastReadPage: lastReadPage,
+        totalPages: totalPages,
+        isCompleted: isCompleted,
+        readingTimeSeconds: readingTimeSeconds,
+        lastReadAt: remoteLastReadAt,
+      );
+
+      final existingLogs = local != null ? List<UserChapterLog>.from(local.chapterLogs) : <UserChapterLog>[];
+      final logIdx = existingLogs.indexWhere((l) => l.chapterId == chapterId);
+      if (logIdx >= 0) {
+        existingLogs[logIdx] = newLog;
+      } else {
+        existingLogs.add(newLog);
+      }
+
+      final totalReadingTime = existingLogs.fold<int>(
+        0,
+        (sum, log) => sum + log.readingTimeSeconds,
+      );
+
+      final mergedLastReadAt = (local != null && local.lastReadAt.isAfter(remoteLastReadAt))
+          ? local.lastReadAt
+          : remoteLastReadAt;
+
+      final updated = (local ?? MangaProgression(
+        id: '',
+        userId: _currentUserId,
+        mangaId: mangaId,
+        lastReadAt: mergedLastReadAt,
+        totalReadingTime: totalReadingTime,
+        chapterLogs: existingLogs,
+      )).copyWith(
+        lastReadAt: mergedLastReadAt,
+        totalReadingTime: totalReadingTime,
+        chapterLogs: existingLogs,
+      );
+
+      await _updateLocalCache(updated, overwrite: true, notify: true);
+
+      // Also update local library cache without triggering duplicate API calls
+      try {
+        await getIt<LibraryService>().updateLocalProgressOnly(
+          mangaId: mangaId,
+          currentChapter: chapterNumber,
+          currentPage: lastReadPage,
+          totalPages: totalPages,
+          isCompleted: isCompleted,
+        );
+      } catch (_) {}
+    } catch (e) {
+      debugPrint('Error handling remote progression from SignalR: $e');
+    }
+  }
 
   Future<void> saveProgression(MangaProgression progression) async {
     // 1. Update local cache (merge) and notify UI immediately
@@ -333,6 +449,12 @@ class ProgressionService extends ChangeNotifier {
     } catch (_) {
       return [];
     }
+  }
+
+  @override
+  void dispose() {
+    _signalRSub?.cancel();
+    super.dispose();
   }
 }
 

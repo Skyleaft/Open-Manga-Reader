@@ -31,7 +31,26 @@ class HistoryController extends ChangeNotifier {
     MangaDetailService? detailService,
   })  : _progressionService = progressionService ?? getIt<ProgressionService>(),
         _apiService = apiService ?? getIt<MangaApiService>(),
-        _detailService = detailService ?? getIt<MangaDetailService>();
+        _detailService = detailService ?? getIt<MangaDetailService>() {
+    _progressionService.addListener(_onProgressionServiceChanged);
+  }
+
+  void _onProgressionServiceChanged() {
+    if (!_disposed) {
+      _reloadHistoryFromLocalCache();
+    }
+  }
+
+  Future<void> _reloadHistoryFromLocalCache() async {
+    try {
+      final list = await _progressionService.getAllProgressions(forceSync: false);
+      list.sort((a, b) => b.lastRead.compareTo(a.lastRead));
+      _progressions = list;
+      await _hydrateMangaDetails(list);
+    } catch (e) {
+      debugPrint('Error reloading history on progression change: $e');
+    }
+  }
 
   void _safeNotifyListeners() {
     if (!_disposed) {
@@ -42,6 +61,7 @@ class HistoryController extends ChangeNotifier {
   @override
   void dispose() {
     _disposed = true;
+    _progressionService.removeListener(_onProgressionServiceChanged);
     super.dispose();
   }
 

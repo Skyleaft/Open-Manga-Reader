@@ -4,6 +4,7 @@ import '../../manga_detail/models/manga_detail.dart';
 import '../../manga_detail/services/manga_detail_service.dart';
 import '../models/library_manga.dart';
 import '../services/library_service.dart';
+import '../../history/services/progression_service.dart';
 
 enum LibrarySortOption {
   lastUpdated,
@@ -15,6 +16,8 @@ enum LibrarySortOption {
 class LibraryController extends ChangeNotifier {
   final LibraryService _libraryService;
   final MangaDetailService _detailService;
+  final ProgressionService _progressionService;
+  bool _disposed = false;
 
   List<LibraryManga> _libraryMangas = [];
   Map<String, MangaDetail> _cachedDetails = {};
@@ -37,8 +40,18 @@ class LibraryController extends ChangeNotifier {
   LibraryController({
     LibraryService? libraryService,
     MangaDetailService? detailService,
+    ProgressionService? progressionService,
   })  : _libraryService = libraryService ?? getIt<LibraryService>(),
-        _detailService = detailService ?? getIt<MangaDetailService>();
+        _detailService = detailService ?? getIt<MangaDetailService>(),
+        _progressionService = progressionService ?? getIt<ProgressionService>() {
+    _progressionService.addListener(_onProgressionChanged);
+  }
+
+  void _onProgressionChanged() {
+    if (!_disposed) {
+      loadLibrary(forceSync: false);
+    }
+  }
 
   Map<String, int> get statusCounts {
     final counts = <String, int>{
@@ -164,5 +177,12 @@ class LibraryController extends ChangeNotifier {
   Future<void> refresh() async {
     await _libraryService.refreshFromApi();
     await loadLibrary();
+  }
+
+  @override
+  void dispose() {
+    _disposed = true;
+    _progressionService.removeListener(_onProgressionChanged);
+    super.dispose();
   }
 }

@@ -306,6 +306,26 @@ class LibraryService {
     }
   }
 
+  Future<void> updateLocalProgressOnly({
+    required String mangaId,
+    required double currentChapter,
+    required int currentPage,
+    required int totalPages,
+    required bool isCompleted,
+  }) async {
+    final library = await _loadFromLocalCache();
+    final index = library.indexWhere((m) => m.id == mangaId);
+    if (index >= 0) {
+      library[index] = library[index].copyWith(
+        currentChapter: currentChapter,
+        currentPage: currentPage,
+        totalPages: totalPages,
+        isCompleted: isCompleted,
+      );
+      await _saveAllToLocalCache(library);
+    }
+  }
+
   List<LibraryManga>? _memoryCache;
 
   Future<void> clearLibrary() async {
