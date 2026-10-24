@@ -289,13 +289,15 @@ class MangaApiService {
   }
 
   Future<PagedResponse<MangaSummary>> queryPagedManga(
-    QueryPagedMangaRequest request,
-  ) async {
+    QueryPagedMangaRequest request, {
+    CancelToken? cancelToken,
+  }) async {
     try {
       final response = await _dio.request(
         '/api/v1/manga',
         data: request.toMap(),
         options: Options(method: 'QUERY'),
+        cancelToken: cancelToken,
       );
 
       final unwrapped = _unwrap(response.data) as Map<String, dynamic>;
@@ -342,11 +344,13 @@ class MangaApiService {
   Future<List<MangaSummary>> searchSemantic(
     String query, {
     int limit = 10,
+    CancelToken? cancelToken,
   }) async {
     try {
       final response = await _dio.get(
         '/api/v1/manga/search/semantic',
         queryParameters: {'q': query, 'limit': limit},
+        cancelToken: cancelToken,
       );
       final unwrapped = _unwrap(response.data);
       final List<dynamic> items = unwrapped is List
