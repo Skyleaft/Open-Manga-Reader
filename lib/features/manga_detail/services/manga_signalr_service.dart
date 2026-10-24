@@ -4,22 +4,28 @@ import 'package:signalr_netcore/signalr_client.dart';
 import '../../../core/config/app_config.dart';
 import '../../../core/di/injection.dart';
 import '../../../core/network/manga_api_service.dart';
+import '../../../core/network/sync_service.dart';
 import '../models/chapter_scraping_progress.dart';
 
 class MangaSignalRService {
   HubConnection? _hubConnection;
   String? _currentBaseUrl;
   final Set<String> _joinedMangaGroups = {};
+  final Set<String> _joinedUserGroups = {};
 
   final _scrapingProgressController =
       StreamController<ChapterScrapingProgress>.broadcast();
   final _chaptersUpdatedController =
       StreamController<ChaptersUpdatedEvent>.broadcast();
+  final _progressionUpdatedController =
+      StreamController<Map<String, dynamic>>.broadcast();
 
   Stream<ChapterScrapingProgress> get scrapingProgressStream =>
       _scrapingProgressController.stream;
   Stream<ChaptersUpdatedEvent> get chaptersUpdatedStream =>
       _chaptersUpdatedController.stream;
+  Stream<Map<String, dynamic>> get progressionUpdatedStream =>
+      _progressionUpdatedController.stream;
 
   bool get isConnected =>
       _hubConnection?.state == HubConnectionState.Connected;
@@ -54,6 +60,14 @@ class MangaSignalRService {
               debugPrint('SignalR: Re-joined manga group "$id"');
             } catch (e) {
               debugPrint('SignalR: Error re-joining manga group "$id": $e');
+            }
+          }
+          for (final userId in _joinedUserGroups) {
+            try {
+              await _hubConnection!.invoke('JoinUserGroup', args: [userId]);
+              debugPrint('SignalR: Re-joined user group "$userId"');
+            } catch (e) {
+              debugPrint('SignalR: Error re-joining user group "$userId": $e');
             }
           }
         } catch (e) {
@@ -94,6 +108,7 @@ class MangaSignalRService {
 
       _hubConnection!.on('ChapterScrapingProgress', _onChapterScrapingProgress);
       _hubConnection!.on('ChaptersUpdated', _onChaptersUpdated);
+      _hubConnection!.on('UserProgressionUpdated', _onUserProgressionUpdated);
 
       _hubConnection!.onclose(({error}) {
         debugPrint('SignalR Hub closed. Error: $error');
@@ -113,6 +128,18 @@ class MangaSignalRService {
             debugPrint('SignalR: Error re-joining manga group "$id": $e');
           }
         }
+        for (final userId in _joinedUserGroups) {
+          try {
+            await _hubConnection!.invoke('JoinUserGroup', args: [userId]);
+            debugPrint('SignalR: Re-joined user group "$userId"');
+          } catch (e) {
+            debugPrint('SignalR: Error re-joining user group "$userId": $e');
+          }
+        }
+        // Auto flush any pending offline actions once connection is back
+        try {
+          getIt<SyncService>().syncPendingActions();
+        } catch (_) {}
       });
 
       await _hubConnection!.start();
@@ -156,6 +183,53 @@ class MangaSignalRService {
     }
   }
 
+  void _onUserProgressionUpdated(List<dynamic>? arguments) {
+    if (arguments == null || arguments.isEmpty) return;
+    try {
+      final raw = arguments[0];
+      if (raw is Map<String, dynamic>) {
+        _progressionUpdatedController.add(raw);
+      } else if (raw is Map) {
+        _progressionUpdatedController.add(Map<String, dynamic>.from(raw));
+      }
+    } catch (e) {
+      debugPrint('Error parsing UserProgressionUpdated SignalR event: $e');
+    }
+  }
+
+  Future<void> joinUserGroup(String userId) async {
+    if (userId.isEmpty) return;
+    _joinedUserGroups.add(userId);
+    await _ensureConnection();
+
+    if (_hubConnection?.state == HubConnectionState.Connected) {
+      try {
+        await _hubConnection!.invoke('JoinUserGroup', args: [userId]);
+        debugPrint('SignalR: Joined user group "$userId"');
+      } catch (e) {
+        debugPrint('SignalR: Error joining user group "$userId": $e');
+      }
+    }
+  }
+
+  Future<void> leaveUserGroup(String userId) async {
+    if (userId.isEmpty) return;
+    _joinedUserGroups.remove(userId);
+
+    if (_hubConnection?.state == HubConnectionState.Connected) {
+      try {
+        await _hubConnection!.invoke('LeaveUserGroup', args: [userId]);
+        debugPrint('SignalR: Left user group "$userId"');
+      } catch (e) {
+        if (_hubConnection?.state != HubConnectionState.Connected ||
+            e.toString().toLowerCase().contains('canceled')) {
+          return;
+        }
+        debugPrint('SignalR: Error leaving user group "$userId": $e');
+      }
+    }
+  }
+
   Future<void> joinMangaGroup(String mangaId) async {
     if (mangaId.isEmpty) return;
     _joinedMangaGroups.add(mangaId);
@@ -191,15 +265,17 @@ class MangaSignalRService {
 
   Future<void> leaveMangaGroupAndDisconnect(String mangaId) async {
     await leaveMangaGroup(mangaId);
-    if (_joinedMangaGroups.isEmpty) {
+    if (_joinedMangaGroups.isEmpty && _joinedUserGroups.isEmpty) {
       await disconnect();
     }
   }
 
   void dispose() {
     _joinedMangaGroups.clear();
+    _joinedUserGroups.clear();
     _scrapingProgressController.close();
     _chaptersUpdatedController.close();
+    _progressionUpdatedController.close();
     _hubConnection?.stop();
     _hubConnection = null;
   }

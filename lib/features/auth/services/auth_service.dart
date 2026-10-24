@@ -10,6 +10,7 @@ import '../../../core/services/heartbeat_service.dart';
 import '../../../core/services/notification_service.dart';
 import '../../history/services/progression_service.dart';
 import '../../library/services/library_service.dart';
+import '../../manga_detail/services/manga_signalr_service.dart';
 import 'google_desktop_auth.dart';
 
 class AuthService {
@@ -33,6 +34,22 @@ class AuthService {
   static bool get _isDesktop =>
       !kIsWeb && (Platform.isWindows || Platform.isLinux || Platform.isMacOS);
 
+  Future<void> _handlePostLogin(String idToken) async {
+    await getIt<MangaApiService>().loginWithFirebase(idToken);
+    await getIt<NotificationService>().syncFcmToken();
+    getIt<HeartbeatService>().start();
+
+    final userId = getIt<MangaApiService>().userId;
+    if (userId != null && userId.isNotEmpty) {
+      getIt<ProgressionService>().joinUserSignalRGroup(userId);
+    }
+
+    await Future.wait([
+      getIt<ProgressionService>().refreshFromApi(),
+      getIt<LibraryService>().refreshFromApi(),
+    ]);
+  }
+
   Future<User?> signInWithGoogle() async {
     try {
       if (kIsWeb) {
@@ -41,15 +58,8 @@ class AuthService {
 
         final idToken = await userCredential.user?.getIdToken();
         if (idToken != null) {
-          await getIt<MangaApiService>().loginWithFirebase(idToken);
-          await getIt<NotificationService>().syncFcmToken();
-          getIt<HeartbeatService>().start();
+          await _handlePostLogin(idToken);
         }
-
-        await Future.wait([
-          getIt<ProgressionService>().refreshFromApi(),
-          getIt<LibraryService>().refreshFromApi(),
-        ]);
 
         return userCredential.user;
       }
@@ -67,15 +77,8 @@ class AuthService {
 
         final idToken = await userCredential.user?.getIdToken();
         if (idToken != null) {
-          await getIt<MangaApiService>().loginWithFirebase(idToken);
-          await getIt<NotificationService>().syncFcmToken();
-          getIt<HeartbeatService>().start();
+          await _handlePostLogin(idToken);
         }
-
-        await Future.wait([
-          getIt<ProgressionService>().refreshFromApi(),
-          getIt<LibraryService>().refreshFromApi(),
-        ]);
 
         return userCredential.user;
       }
@@ -95,15 +98,8 @@ class AuthService {
 
       final idToken = await userCredential.user?.getIdToken();
       if (idToken != null) {
-        await getIt<MangaApiService>().loginWithFirebase(idToken);
-        await getIt<NotificationService>().syncFcmToken();
-        getIt<HeartbeatService>().start();
+        await _handlePostLogin(idToken);
       }
-
-      await Future.wait([
-        getIt<ProgressionService>().refreshFromApi(),
-        getIt<LibraryService>().refreshFromApi(),
-      ]);
 
       return userCredential.user;
     } on FirebaseAuthException catch (e) {
@@ -116,6 +112,8 @@ class AuthService {
   }
 
   Future<void> signOut() async {
+    final currentUserId = getIt<MangaApiService>().userId;
+
     try {
       if (!kIsWeb && !_isDesktop) {
         await _googleSignIn.signOut();
@@ -135,6 +133,12 @@ class AuthService {
       await getIt<NotificationService>().unregisterFcmToken();
     } catch (e) {
       debugPrint('Notification service unregister error: $e');
+    }
+
+    if (currentUserId != null && currentUserId.isNotEmpty) {
+      try {
+        await getIt<MangaSignalRService>().leaveUserGroup(currentUserId);
+      } catch (_) {}
     }
 
     try {

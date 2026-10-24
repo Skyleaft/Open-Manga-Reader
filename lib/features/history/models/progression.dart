@@ -220,6 +220,7 @@ class MangaProgression {
       'totalPages': totalPages,
       'isCompleted': isCompleted,
       'readingTimeSeconds': readingTimeSeconds,
+      'lastReadAt': lastReadAt.toUtc().toIso8601String(),
     };
   }
 
