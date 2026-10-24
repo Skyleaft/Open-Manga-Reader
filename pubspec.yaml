@@ -1,7 +1,7 @@
 name: my_manga_reader
 description: "A new Flutter project."
 publish_to: 'none'
-version: 0.6.91
+version: 0.7.0
 
 environment:
   sdk: ^3.11.0
