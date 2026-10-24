@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:url_launcher/url_launcher.dart';
 import '../../../core/di/injection.dart';
 import '../../../core/services/network_status_service.dart';
 import '../../../core/widgets/alert_banner.dart';
@@ -10,6 +9,7 @@ import '../../discover/presentation/discover_screen.dart';
 import '../../home/presentation/home_screen.dart';
 import '../../library/presentation/library_screen.dart';
 import '../../settings/presentation/more_screen.dart';
+import '../../settings/presentation/widgets/app_update_dialog.dart';
 import '../../settings/services/update_service.dart';
 
 class MainScreen extends StatefulWidget {
@@ -98,40 +98,7 @@ class _MainScreenState extends State<MainScreen> {
   }
 
   void _showUpdateDialog(Map<String, dynamic> updateData) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Update Available!'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('A new version (${updateData['version']}) is available.'),
-            const SizedBox(height: 8),
-            Text(
-              updateData['body'] ?? 'Performance improvements and bug fixes.',
-              maxLines: 5,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(fontSize: 12, color: Colors.grey),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Later'),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              Navigator.pop(context);
-              final url = Uri.parse(updateData['url']);
-              launchUrl(url, mode: LaunchMode.externalApplication);
-            },
-            child: const Text('Update Now'),
-          ),
-        ],
-      ),
-    );
+    AppUpdateDialog.show(context, updateData);
   }
 
   void _navigateTo(int index) {
