@@ -3,12 +3,10 @@ import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:package_info_plus/package_info_plus.dart';
-import 'package:cached_network_image_ce/cached_network_image.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/di/injection.dart';
 import '../../../core/network/manga_api_service.dart';
 import '../../../core/theme/theme_provider.dart';
-import '../../../core/utils/formatters.dart';
 import '../../../core/widgets/alert_banner.dart';
 import '../../../core/widgets/shimmer_box.dart';
 import '../../auth/services/auth_service.dart';
@@ -16,7 +14,7 @@ import '../../history/models/progression.dart';
 import '../../history/services/progression_service.dart';
 import '../../../routes/app_pages.dart';
 import '../../download/services/download_service.dart';
-import '../../library/models/library_manga.dart';
+import '../../library/services/library_service.dart';
 import '../../manga_detail/models/manga_detail.dart';
 import '../../manga_detail/services/manga_detail_service.dart';
 import '../services/storage_service.dart';
@@ -25,6 +23,9 @@ import 'base_api_setting_screen.dart';
 import 'storage_setting_screen.dart';
 import 'theme_setting_screen.dart';
 import 'widgets/app_update_dialog.dart';
+import 'widgets/chapters_read_sheet.dart';
+import 'widgets/reading_stats_sheet.dart';
+import 'widgets/time_spent_sheet.dart';
 
 class MoreScreen extends StatefulWidget {
   const MoreScreen({super.key});
@@ -37,8 +38,11 @@ class _MoreScreenState extends State<MoreScreen>
     with AutomaticKeepAliveClientMixin {
   String _appVersion = 'Loading...';
   final _progressionService = getIt<ProgressionService>();
+  final _downloadService = getIt<DownloadService>();
   final _apiService = getIt<MangaApiService>();
   final _storageService = getIt<StorageService>();
+
+  String? _currentUid;
 
   @override
   bool get wantKeepAlive => true;
@@ -55,8 +59,41 @@ class _MoreScreenState extends State<MoreScreen>
   @override
   void initState() {
     super.initState();
+    _progressionService.addListener(_onProgressionChanged);
+    _downloadService.tasksNotifier.addListener(_onDownloadsChanged);
     _loadAppVersion();
     _loadStats();
+    _loadStorageSizes();
+  }
+
+  @override
+  void dispose() {
+    _progressionService.removeListener(_onProgressionChanged);
+    _downloadService.tasksNotifier.removeListener(_onDownloadsChanged);
+    super.dispose();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final auth = Provider.of<AuthService>(context, listen: false);
+    final uid = auth.currentUser?.uid;
+    if (_currentUid != null && _currentUid != uid) {
+      _currentUid = uid;
+      _loadStats();
+      _loadStorageSizes();
+    } else {
+      _currentUid = uid;
+    }
+  }
+
+  void _onProgressionChanged() {
+    if (!mounted) return;
+    _loadStats(silent: true);
+  }
+
+  void _onDownloadsChanged() {
+    if (!mounted) return;
     _loadStorageSizes();
   }
 
@@ -65,9 +102,8 @@ class _MoreScreenState extends State<MoreScreen>
     int downloadSize = 0;
     int downloadCount = 0;
     try {
-      final downloadService = getIt<DownloadService>();
-      downloadSize = downloadService.getTotalDownloadedBytes();
-      final groups = downloadService.getDownloadsGroupedByManga();
+      downloadSize = _downloadService.getTotalDownloadedBytes();
+      final groups = _downloadService.getDownloadsGroupedByManga();
       downloadCount = groups.fold<int>(0, (sum, g) => sum + g.chapterCount);
     } catch (_) {}
 
@@ -82,23 +118,40 @@ class _MoreScreenState extends State<MoreScreen>
 
   Future<void> _loadCacheSize() => _loadStorageSizes();
 
-  Future<void> _loadStats() async {
+  Future<void> _loadStats({bool silent = false}) async {
     if (!mounted) return;
-    setState(() => _isLoadingStats = true);
+    if (!silent && _progressions.isEmpty) {
+      setState(() => _isLoadingStats = true);
+    }
     try {
       final progressions = await _progressionService.getAllProgressions();
 
-      final detailService = getIt<MangaDetailService>();
-      final libraryData = await _apiService.getUserLibrary();
-      final libraryMap = <String, LibraryManga>{};
-      for (final json in libraryData) {
-        try {
-          final manga = LibraryManga.fromMap(json);
-          libraryMap[manga.id] = manga;
-        } catch (_) {}
+      int totalChapters = 0;
+      int totalSeconds = 0;
+      for (final p in progressions) {
+        totalSeconds += p.totalReadingTime;
+        for (final log in p.chapterLogs) {
+          if (log.isCompleted) {
+            totalChapters++;
+          }
+        }
       }
 
-      final Map<String, Map<String, dynamic>> detailsMap = {};
+      // Immediately reflect counts to UI (flicker-free real-time response)
+      if (mounted) {
+        setState(() {
+          _progressions = progressions;
+          _totalChaptersRead = totalChapters;
+          _totalReadingTimeSeconds = totalSeconds;
+          _isLoadingStats = false;
+        });
+      }
+
+      // Progressively resolve missing manga metadata (covers, titles)
+      final detailService = getIt<MangaDetailService>();
+      final libraryService = getIt<LibraryService>();
+      final detailsMap =
+          Map<String, Map<String, dynamic>>.from(_mangaDetailsMap);
       final missingMangaIds = <String>{};
 
       for (final p in progressions) {
@@ -111,25 +164,28 @@ class _MoreScreenState extends State<MoreScreen>
             'imageUrl': p.manga!.imageUrl ?? '',
             'localImageUrl': p.manga!.localImageUrl,
           };
-        } else if (libraryMap.containsKey(p.mangaId)) {
-          final libManga = libraryMap[p.mangaId]!;
-          detailsMap[p.mangaId] = {
-            'title': libManga.title,
-            'author': libManga.author,
-            'imageUrl': libManga.imageUrl,
-            'localImageUrl': libManga.imageUrl,
-          };
         } else {
-          final cached = await detailService.getDetail(p.mangaId);
-          if (cached != null) {
+          // Check local cached MangaDetail or Library first before remote network!
+          final cachedDetail = await detailService.getDetail(p.mangaId);
+          if (cachedDetail != null) {
             detailsMap[p.mangaId] = {
-              'title': cached.title,
-              'author': cached.author,
-              'imageUrl': cached.imageUrl ?? '',
-              'localImageUrl': cached.localImageUrl,
+              'title': cachedDetail.title,
+              'author': cachedDetail.author,
+              'imageUrl': cachedDetail.imageUrl ?? '',
+              'localImageUrl': cachedDetail.localImageUrl,
             };
           } else {
-            missingMangaIds.add(p.mangaId);
+            final libManga = await libraryService.getLibraryManga(p.mangaId);
+            if (libManga != null) {
+              detailsMap[p.mangaId] = {
+                'title': libManga.title,
+                'author': libManga.author,
+                'imageUrl': libManga.imageUrl,
+                'localImageUrl': libManga.imageUrl,
+              };
+            } else {
+              missingMangaIds.add(p.mangaId);
+            }
           }
         }
       }
@@ -157,24 +213,9 @@ class _MoreScreenState extends State<MoreScreen>
         );
       }
 
-      int totalChapters = 0;
-      int totalSeconds = 0;
-      for (final p in progressions) {
-        totalSeconds += p.totalReadingTime;
-        for (final log in p.chapterLogs) {
-          if (log.isCompleted) {
-            totalChapters++;
-          }
-        }
-      }
-
       if (mounted) {
         setState(() {
-          _progressions = progressions;
           _mangaDetailsMap = detailsMap;
-          _totalChaptersRead = totalChapters;
-          _totalReadingTimeSeconds = totalSeconds;
-          _isLoadingStats = false;
         });
       }
     } catch (e) {
@@ -249,31 +290,25 @@ class _MoreScreenState extends State<MoreScreen>
     if (_isCheckingUpdate) return;
     setState(() => _isCheckingUpdate = true);
 
-    AlertBanner.show(
-      context,
-      'Checking for latest version...',
-      type: AlertBannerType.info,
-      duration: const Duration(seconds: 2),
-    );
-
     try {
-      final updateService = UpdateService();
-      final releaseInfo = await updateService.getLatestReleaseInfo();
+      AlertBanner.show(
+        context,
+        'Checking for latest updates...',
+        type: AlertBannerType.info,
+        duration: const Duration(seconds: 2),
+      );
+
+      final updateService = getIt<UpdateService>();
+      final updateData = await updateService.checkForUpdate();
 
       if (!mounted) return;
 
-      if (releaseInfo == null) {
-        AlertBanner.show(
-          context,
-          'Failed to check for updates. Check your connection.',
-          type: AlertBannerType.error,
-        );
-      } else if (releaseInfo['hasUpdate'] == true) {
-        _showUpdateDialog(releaseInfo);
+      if (updateData != null && updateData['hasUpdate'] == true) {
+        _showUpdateDialog(updateData);
       } else {
         AlertBanner.show(
           context,
-          'You are already using the latest version ($_appVersion)',
+          'You are using the latest version ($_appVersion)',
           type: AlertBannerType.success,
         );
       }
@@ -281,7 +316,7 @@ class _MoreScreenState extends State<MoreScreen>
       if (mounted) {
         AlertBanner.show(
           context,
-          'Error checking update: $e',
+          'Failed to check for updates: $e',
           type: AlertBannerType.error,
         );
       }
@@ -304,186 +339,250 @@ class _MoreScreenState extends State<MoreScreen>
     final themeProvider = Provider.of<ThemeProvider>(context);
 
     return Scaffold(
-      backgroundColor: isDark
-          ? AppColors.backgroundDark
-          : AppColors.backgroundLight,
+      backgroundColor:
+          isDark ? AppColors.backgroundDark : AppColors.backgroundLight,
       body: SafeArea(
-        child: SingleChildScrollView(
-          physics: const AlwaysScrollableScrollPhysics(
-            parent: BouncingScrollPhysics(),
-          ),
-          padding: const EdgeInsets.fromLTRB(16, 24, 16, 120),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _buildHeader(isDark, authService.currentUser),
-              _buildStatsCard(isDark),
-              const SizedBox(height: 32),
+        child: RefreshIndicator(
+          color: Theme.of(context).colorScheme.primary,
+          onRefresh: () async {
+            await Future.wait([
+              _progressionService.refreshFromApi(),
+              _loadStorageSizes(),
+            ]);
+            await _loadStats(silent: false);
+          },
+          child: SingleChildScrollView(
+            physics: const AlwaysScrollableScrollPhysics(
+              parent: BouncingScrollPhysics(),
+            ),
+            padding: const EdgeInsets.fromLTRB(16, 24, 16, 120),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _buildHeader(isDark, authService.currentUser),
+                _buildStatsCard(isDark),
+                const SizedBox(height: 32),
 
-              _buildCategoryTitle('Settings'),
-              _buildMenuItem(
-                context,
-                icon: Icons.api_outlined,
-                title: 'Base API Setting',
-                onTap: () {
-                  if (!context.mounted) return;
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => const BaseApiSettingScreen(),
-                    ),
-                  );
-                },
-              ),
-              _buildMenuItem(
-                context,
-                icon: Icons.palette_outlined,
-                title: 'Theme',
-                subtitle: '${themeProvider.themeModeName} • ${themeProvider.currentScheme.name}',
-                onTap: () {
-                  if (!context.mounted) return;
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => const ThemeSettingScreen(),
-                    ),
-                  );
-                },
-              ),
-              _buildMenuItem(
-                context,
-                icon: Icons.notifications_outlined,
-                title: 'Notification',
-                onTap: () {},
-              ),
-              _buildMenuItem(
-                context,
-                icon: Icons.language_outlined,
-                title: 'Language',
-                onTap: () {},
-              ),
+                _buildCategoryTitle('Settings'),
+                _buildMenuItem(
+                  context,
+                  icon: Icons.api_outlined,
+                  title: 'Base API Setting',
+                  onTap: () {
+                    if (!context.mounted) return;
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const BaseApiSettingScreen(),
+                      ),
+                    );
+                  },
+                ),
+                _buildMenuItem(
+                  context,
+                  icon: Icons.palette_outlined,
+                  title: 'Theme',
+                  subtitle:
+                      '${themeProvider.themeModeName} • ${themeProvider.currentScheme.name}',
+                  onTap: () {
+                    if (!context.mounted) return;
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const ThemeSettingScreen(),
+                      ),
+                    );
+                  },
+                ),
+                _buildMenuItem(
+                  context,
+                  icon: Icons.notifications_outlined,
+                  title: 'Notification',
+                  subtitle: 'Push notifications active',
+                  onTap: () {
+                    AlertBanner.show(
+                      context,
+                      'Notifications are enabled for new chapters & updates',
+                      type: AlertBannerType.info,
+                    );
+                  },
+                ),
+                _buildMenuItem(
+                  context,
+                  icon: Icons.language_outlined,
+                  title: 'Language',
+                  subtitle: 'System default (English)',
+                  onTap: () {
+                    AlertBanner.show(
+                      context,
+                      'Language follows your system language settings',
+                      type: AlertBannerType.info,
+                    );
+                  },
+                ),
 
-              const SizedBox(height: 24),
-              _buildCategoryTitle('Data'),
-              _buildMenuItem(
-                context,
-                icon: Icons.download_done_rounded,
-                title: 'Downloaded Chapters',
-                subtitle: _downloadedCount > 0
-                    ? '$_downloadedCount chapters (${StorageService.formatBytes(_downloadedSizeBytes)})'
-                    : 'Manage offline chapters',
-                onTap: _openDownloadedChapters,
-              ),
-              _buildMenuItem(
-                context,
-                icon: Icons.cleaning_services_outlined,
-                title: 'Clear Cache',
-                subtitle: _cacheSizeBytes > 0
-                    ? StorageService.formatBytes(_cacheSizeBytes)
-                    : '0 B',
-                onTap: _handleClearCache,
-              ),
-              _buildMenuItem(
-                context,
-                icon: Icons.data_usage_outlined,
-                title: 'Storage Usage',
-                subtitle: 'Detailed breakdown & cache management',
-                onTap: () async {
-                  if (!context.mounted) return;
-                  await Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => const StorageSettingScreen(),
-                    ),
-                  );
-                  if (mounted) {
-                    _loadStorageSizes();
-                  }
-                },
-              ),
+                const SizedBox(height: 24),
+                _buildCategoryTitle('Data'),
+                _buildMenuItem(
+                  context,
+                  icon: Icons.download_done_rounded,
+                  title: 'Downloaded Chapters',
+                  subtitle: _downloadedCount > 0
+                      ? '$_downloadedCount chapters (${StorageService.formatBytes(_downloadedSizeBytes)})'
+                      : 'Manage offline chapters',
+                  onTap: _openDownloadedChapters,
+                ),
+                _buildMenuItem(
+                  context,
+                  icon: Icons.cleaning_services_outlined,
+                  title: 'Clear Cache',
+                  subtitle: _cacheSizeBytes > 0
+                      ? StorageService.formatBytes(_cacheSizeBytes)
+                      : '0 B',
+                  onTap: _handleClearCache,
+                ),
+                _buildMenuItem(
+                  context,
+                  icon: Icons.data_usage_outlined,
+                  title: 'Storage Usage',
+                  subtitle: 'Detailed breakdown & cache management',
+                  onTap: () async {
+                    if (!context.mounted) return;
+                    await Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const StorageSettingScreen(),
+                      ),
+                    );
+                    if (mounted) {
+                      _loadStorageSizes();
+                    }
+                  },
+                ),
 
-              const SizedBox(height: 24),
-              _buildCategoryTitle('Stats'),
-              _buildMenuItem(
-                context,
-                icon: Icons.bar_chart_rounded,
-                title: 'Reading Statistics',
-                subtitle: _progressions.isNotEmpty
-                    ? '${_progressions.length} titles tracked'
-                    : 'Track titles and progress',
-                onTap: _showReadingStatsDialog,
-              ),
-              _buildMenuItem(
-                context,
-                icon: Icons.access_time_filled_rounded,
-                title: 'Time Spent',
-                subtitle: _totalReadingTimeSeconds > 0
-                    ? '${_formatReadingTime(_totalReadingTimeSeconds)} total duration'
-                    : '0m',
-                onTap: _showTimeSpentDialog,
-              ),
-              _buildMenuItem(
-                context,
-                icon: Icons.checklist_rounded,
-                title: 'Chapters Read',
-                subtitle: _totalChaptersRead > 0
-                    ? '$_totalChaptersRead chapters completed'
-                    : '0 chapters',
-                onTap: _showChaptersReadDialog,
-              ),
+                const SizedBox(height: 24),
+                _buildCategoryTitle('Stats'),
+                _buildMenuItem(
+                  context,
+                  icon: Icons.bar_chart_rounded,
+                  title: 'Reading Statistics',
+                  subtitle: _progressions.isNotEmpty
+                      ? '${_progressions.length} titles tracked'
+                      : 'Track titles and progress',
+                  onTap: _showReadingStatsDialog,
+                ),
+                _buildMenuItem(
+                  context,
+                  icon: Icons.access_time_filled_rounded,
+                  title: 'Time Spent',
+                  subtitle: _totalReadingTimeSeconds > 0
+                      ? '${_formatReadingTime(_totalReadingTimeSeconds)} total duration'
+                      : '0m',
+                  onTap: _showTimeSpentDialog,
+                ),
+                _buildMenuItem(
+                  context,
+                  icon: Icons.checklist_rounded,
+                  title: 'Chapters Read',
+                  subtitle: _totalChaptersRead > 0
+                      ? '$_totalChaptersRead chapters completed'
+                      : '0 chapters',
+                  onTap: _showChaptersReadDialog,
+                ),
 
-              const SizedBox(height: 24),
-              _buildCategoryTitle('Support'),
-              _buildMenuItem(
-                context,
-                icon: Icons.help_outline,
-                title: 'Help Center',
-                onTap: () {},
-              ),
-              _buildMenuItem(
-                context,
-                icon: Icons.bug_report_outlined,
-                title: 'Report Bug',
-                onTap: () {},
-              ),
-              _buildMenuItem(
-                context,
-                icon: Icons.library_add_outlined,
-                title: 'Request Manga',
-                onTap: () {},
-              ),
+                const SizedBox(height: 24),
+                _buildCategoryTitle('Support'),
+                _buildMenuItem(
+                  context,
+                  icon: Icons.help_outline,
+                  title: 'Help Center',
+                  subtitle: 'User guide and documentation',
+                  onTap: () {
+                    AlertBanner.show(
+                      context,
+                      'Visit Open Manga Reader documentation on GitHub for guides',
+                      type: AlertBannerType.info,
+                    );
+                  },
+                ),
+                _buildMenuItem(
+                  context,
+                  icon: Icons.bug_report_outlined,
+                  title: 'Report Bug',
+                  subtitle: 'Submit an issue or feedback',
+                  onTap: () {
+                    AlertBanner.show(
+                      context,
+                      'Submit bug reports and feature requests on GitHub Issues',
+                      type: AlertBannerType.info,
+                    );
+                  },
+                ),
+                _buildMenuItem(
+                  context,
+                  icon: Icons.library_add_outlined,
+                  title: 'Request Manga',
+                  subtitle: 'Request new sources or titles',
+                  onTap: () {
+                    AlertBanner.show(
+                      context,
+                      'Request new manga sources or extensions on GitHub',
+                      type: AlertBannerType.info,
+                    );
+                  },
+                ),
 
-              const SizedBox(height: 24),
-              _buildCategoryTitle('About'),
-              _buildMenuItem(
-                context,
-                icon: Icons.info_outline,
-                title: 'App Version',
-                subtitle: _appVersion,
-                onTap: _handleVersionTap,
-              ),
-              _buildMenuItem(
-                context,
-                icon: Icons.privacy_tip_outlined,
-                title: 'Privacy Policy',
-                onTap: () {},
-              ),
-              _buildMenuItem(
-                context,
-                icon: Icons.description_outlined,
-                title: 'Terms of Service',
-                onTap: () {},
-              ),
-              _buildMenuItem(
-                context,
-                icon: Icons.code,
-                title: 'Open Source Licenses',
-                onTap: () {},
-              ),
+                const SizedBox(height: 24),
+                _buildCategoryTitle('About'),
+                _buildMenuItem(
+                  context,
+                  icon: Icons.info_outline,
+                  title: 'App Version',
+                  subtitle: _appVersion,
+                  onTap: _handleVersionTap,
+                ),
+                _buildMenuItem(
+                  context,
+                  icon: Icons.privacy_tip_outlined,
+                  title: 'Privacy Policy',
+                  onTap: () {
+                    AlertBanner.show(
+                      context,
+                      'Open Manga Reader operates with local-first, privacy-respecting storage',
+                      type: AlertBannerType.info,
+                    );
+                  },
+                ),
+                _buildMenuItem(
+                  context,
+                  icon: Icons.description_outlined,
+                  title: 'Terms of Service',
+                  onTap: () {
+                    AlertBanner.show(
+                      context,
+                      'Open source application licensed under GNU GPL v3',
+                      type: AlertBannerType.info,
+                    );
+                  },
+                ),
+                _buildMenuItem(
+                  context,
+                  icon: Icons.code,
+                  title: 'Open Source Licenses',
+                  subtitle: 'View software licenses',
+                  onTap: () {
+                    showLicensePage(
+                      context: context,
+                      applicationName: 'Open Manga Reader',
+                      applicationVersion: _appVersion,
+                    );
+                  },
+                ),
 
-              const SizedBox(height: 32),
-              _buildFooter(context),
-            ],
+                const SizedBox(height: 32),
+                _buildFooter(context),
+              ],
+            ),
           ),
         ),
       ),
@@ -554,13 +653,17 @@ class _MoreScreenState extends State<MoreScreen>
       );
     }
 
-    final topMangaInfo = topManga != null ? _mangaDetailsMap[topManga.mangaId] : null;
+    final topMangaInfo =
+        topManga != null ? _mangaDetailsMap[topManga.mangaId] : null;
     final topMangaTitle = topMangaInfo?['title'] ?? topManga?.manga?.title;
-    final hasTopManga = topManga != null && topManga.totalReadingTime > 0 && topMangaTitle != null;
+    final hasTopManga = topManga != null &&
+        topManga.totalReadingTime > 0 &&
+        topMangaTitle != null;
 
-    final avgMinutesPerChapter = (_totalChaptersRead > 0 && _totalReadingTimeSeconds > 0)
-        ? (_totalReadingTimeSeconds / 60 / _totalChaptersRead).round()
-        : 0;
+    final avgMinutesPerChapter =
+        (_totalChaptersRead > 0 && _totalReadingTimeSeconds > 0)
+            ? (_totalReadingTimeSeconds / 60 / _totalChaptersRead).round()
+            : 0;
 
     return Container(
       margin: const EdgeInsets.only(top: 16),
@@ -600,12 +703,12 @@ class _MoreScreenState extends State<MoreScreen>
               Row(
                 children: [
                   Container(
-                    padding: const EdgeInsets.all(8),
+                    padding: const EdgeInsets.all(10),
                     decoration: BoxDecoration(
                       gradient: LinearGradient(
                         colors: [
                           primary,
-                          primary.withValues(alpha: 0.75),
+                          primary.withValues(alpha: 0.7),
                         ],
                         begin: Alignment.topLeft,
                         end: Alignment.bottomRight,
@@ -613,14 +716,14 @@ class _MoreScreenState extends State<MoreScreen>
                       borderRadius: BorderRadius.circular(12),
                       boxShadow: [
                         BoxShadow(
-                          color: primary.withValues(alpha: 0.35),
+                          color: primary.withValues(alpha: 0.3),
                           blurRadius: 8,
                           offset: const Offset(0, 3),
                         ),
                       ],
                     ),
                     child: const Icon(
-                      Icons.insights_rounded,
+                      Icons.auto_graph_rounded,
                       color: Colors.white,
                       size: 20,
                     ),
@@ -646,7 +749,8 @@ class _MoreScreenState extends State<MoreScreen>
                               : 'Track your reading journey',
                           style: TextStyle(
                             fontSize: 12,
-                            color: isDark ? Colors.white60 : Colors.grey.shade600,
+                            color:
+                                isDark ? Colors.white60 : Colors.grey.shade600,
                           ),
                         ),
                       ],
@@ -656,7 +760,8 @@ class _MoreScreenState extends State<MoreScreen>
                     onTap: _showReadingStatsDialog,
                     borderRadius: BorderRadius.circular(20),
                     child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 10, vertical: 5),
                       decoration: BoxDecoration(
                         color: primary.withValues(alpha: isDark ? 0.15 : 0.08),
                         borderRadius: BorderRadius.circular(20),
@@ -673,7 +778,8 @@ class _MoreScreenState extends State<MoreScreen>
                             ),
                           ),
                           const SizedBox(width: 2),
-                          Icon(Icons.chevron_right_rounded, size: 16, color: primary),
+                          Icon(Icons.chevron_right_rounded,
+                              size: 16, color: primary),
                         ],
                       ),
                     ),
@@ -704,7 +810,9 @@ class _MoreScreenState extends State<MoreScreen>
                       iconColor: const Color(0xFFF59E0B),
                       value: _formatReadingTime(_totalReadingTimeSeconds),
                       label: 'Time Spent',
-                      badge: avgMinutesPerChapter > 0 ? '~$avgMinutesPerChapter m/ch' : null,
+                      badge: avgMinutesPerChapter > 0
+                          ? '~$avgMinutesPerChapter m/ch'
+                          : null,
                       onTap: _showTimeSpentDialog,
                     ),
                   ),
@@ -723,14 +831,15 @@ class _MoreScreenState extends State<MoreScreen>
                 ],
               ),
 
-              // Highlight Banner (Top Read Manga or encouragement)
+              // Highlight Banner (Top Read Manga)
               if (hasTopManga) ...[
                 const SizedBox(height: 12),
                 InkWell(
                   onTap: () => _navigateToDetail(topManga!.mangaId),
                   borderRadius: BorderRadius.circular(12),
                   child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                     decoration: BoxDecoration(
                       color: isDark
                           ? Colors.white.withValues(alpha: 0.04)
@@ -757,24 +866,32 @@ class _MoreScreenState extends State<MoreScreen>
                             text: TextSpan(
                               style: TextStyle(
                                 fontSize: 12,
-                                color: isDark ? Colors.white70 : const Color(0xFF475569),
+                                color: isDark
+                                    ? Colors.white70
+                                    : const Color(0xFF475569),
                               ),
                               children: [
                                 const TextSpan(
                                   text: 'Top Title: ',
-                                  style: TextStyle(fontWeight: FontWeight.w600),
+                                  style:
+                                      TextStyle(fontWeight: FontWeight.w600),
                                 ),
                                 TextSpan(
                                   text: topMangaTitle,
                                   style: TextStyle(
                                     fontWeight: FontWeight.bold,
-                                    color: isDark ? Colors.white : AppColors.textLight,
+                                    color: isDark
+                                        ? Colors.white
+                                        : AppColors.textLight,
                                   ),
                                 ),
                                 TextSpan(
-                                  text: ' (${_formatReadingTime(topManga.totalReadingTime)})',
+                                  text:
+                                      ' (${_formatReadingTime(topManga.totalReadingTime)})',
                                   style: TextStyle(
-                                    color: isDark ? Colors.white60 : Colors.grey.shade600,
+                                    color: isDark
+                                        ? Colors.white60
+                                        : Colors.grey.shade600,
                                     fontSize: 11,
                                   ),
                                 ),
@@ -785,7 +902,9 @@ class _MoreScreenState extends State<MoreScreen>
                         Icon(
                           Icons.arrow_forward_ios_rounded,
                           size: 12,
-                          color: isDark ? Colors.white38 : Colors.grey.shade400,
+                          color: isDark
+                              ? Colors.white38
+                              : Colors.grey.shade400,
                         ),
                       ],
                     ),
@@ -863,7 +982,8 @@ class _MoreScreenState extends State<MoreScreen>
             if (badge != null) ...[
               const SizedBox(height: 4),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
                 decoration: BoxDecoration(
                   color: iconColor.withValues(alpha: isDark ? 0.15 : 0.1),
                   borderRadius: BorderRadius.circular(6),
@@ -904,7 +1024,7 @@ class _MoreScreenState extends State<MoreScreen>
       if (!mounted) return;
       await Navigator.pushNamed(context, AppRoutes.detail, arguments: detail);
       if (mounted) {
-        _loadStats();
+        _loadStats(silent: true);
       }
     } catch (e) {
       debugPrint('Error navigating to manga detail: $e');
@@ -913,1083 +1033,31 @@ class _MoreScreenState extends State<MoreScreen>
 
   void _showReadingStatsDialog() {
     HapticFeedback.selectionClick();
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final primary = Theme.of(context).colorScheme.primary;
-
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (context) {
-        String sortBy = 'recent';
-
-        return StatefulBuilder(
-          builder: (context, setModalState) {
-            final sortedList = List<MangaProgression>.from(_progressions);
-            if (sortBy == 'recent') {
-              sortedList.sort((a, b) => b.lastReadAt.compareTo(a.lastReadAt));
-            } else if (sortBy == 'time') {
-              sortedList.sort((a, b) => b.totalReadingTime.compareTo(a.totalReadingTime));
-            } else if (sortBy == 'chapters') {
-              sortedList.sort((a, b) {
-                final aCount = a.chapterLogs.where((l) => l.isCompleted).length;
-                final bCount = b.chapterLogs.where((l) => l.isCompleted).length;
-                return bCount.compareTo(aCount);
-              });
-            }
-
-            return Container(
-              height: MediaQuery.of(context).size.height * 0.85,
-              decoration: BoxDecoration(
-                color: isDark ? const Color(0xFF1E293B) : Colors.white,
-                borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.3),
-                    blurRadius: 24,
-                    offset: const Offset(0, -4),
-                  ),
-                ],
-              ),
-              child: Column(
-                children: [
-                  _buildSheetHandle(isDark),
-                  _buildSheetHeader(
-                    context,
-                    title: 'Reading Statistics',
-                    subtitle: '${_progressions.length} titles tracked',
-                    icon: Icons.bar_chart_rounded,
-                    iconColor: const Color(0xFF3B82F6),
-                  ),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-                    child: Row(
-                      children: [
-                        Text(
-                          'Sort by:',
-                          style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w600,
-                            color: isDark ? Colors.white60 : Colors.grey.shade600,
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        _buildFilterChip(
-                          label: 'Recent',
-                          isSelected: sortBy == 'recent',
-                          onTap: () => setModalState(() => sortBy = 'recent'),
-                          isDark: isDark,
-                          primary: primary,
-                        ),
-                        const SizedBox(width: 6),
-                        _buildFilterChip(
-                          label: 'Most Time',
-                          isSelected: sortBy == 'time',
-                          onTap: () => setModalState(() => sortBy = 'time'),
-                          isDark: isDark,
-                          primary: primary,
-                        ),
-                        const SizedBox(width: 6),
-                        _buildFilterChip(
-                          label: 'Chapters',
-                          isSelected: sortBy == 'chapters',
-                          onTap: () => setModalState(() => sortBy = 'chapters'),
-                          isDark: isDark,
-                          primary: primary,
-                        ),
-                      ],
-                    ),
-                  ),
-                  const Divider(height: 1),
-                  Expanded(
-                    child: sortedList.isEmpty
-                        ? _buildEmptyStatsState(
-                            isDark: isDark,
-                            icon: Icons.menu_book_rounded,
-                            title: 'No reading activity yet',
-                            description: 'Read any manga chapter to automatically record your statistics.',
-                          )
-                        : ListView.separated(
-                            padding: const EdgeInsets.fromLTRB(20, 16, 20, 32),
-                            itemCount: sortedList.length,
-                            separatorBuilder: (_, _) => const SizedBox(height: 12),
-                            itemBuilder: (context, index) {
-                              final p = sortedList[index];
-                              final mangaInfo = _mangaDetailsMap[p.mangaId];
-                              final title = mangaInfo?['title'] ?? p.manga?.title ?? 'Manga #${p.mangaId}';
-                              final author = mangaInfo?['author'] ?? p.manga?.author ?? 'Unknown Author';
-                              final localImg = mangaInfo?['localImageUrl'] ?? p.manga?.localImageUrl;
-                              final remoteImg = mangaInfo?['imageUrl'] ?? p.manga?.imageUrl;
-                              final imageUrl = _apiService.getLocalImageUrl(localImg, remoteImg);
-                              final completedCount = p.chapterLogs.where((l) => l.isCompleted).length;
-
-                              return InkWell(
-                                onTap: () {
-                                  Navigator.pop(context);
-                                  _navigateToDetail(p.mangaId);
-                                },
-                                borderRadius: BorderRadius.circular(16),
-                                child: Container(
-                                  padding: const EdgeInsets.all(12),
-                                  decoration: BoxDecoration(
-                                    color: isDark
-                                        ? Colors.white.withValues(alpha: 0.04)
-                                        : const Color(0xFFF8FAFC),
-                                    borderRadius: BorderRadius.circular(16),
-                                    border: Border.all(
-                                      color: isDark
-                                          ? Colors.white.withValues(alpha: 0.06)
-                                          : const Color(0xFFE2E8F0),
-                                    ),
-                                  ),
-                                  child: Row(
-                                    children: [
-                                      ClipRRect(
-                                        borderRadius: BorderRadius.circular(10),
-                                        child: SizedBox(
-                                          width: 52,
-                                          height: 72,
-                                          child: imageUrl.isNotEmpty
-                                              ? CachedNetworkImage(
-                                                  imageUrl: imageUrl,
-                                                  fit: BoxFit.cover,
-                                                  memCacheWidth: 150,
-                                                  placeholder: (_, _) => Container(
-                                                    color: isDark ? Colors.grey[850] : Colors.grey[200],
-                                                  ),
-                                                  errorBuilder: (_, _, _) => Container(
-                                                    color: isDark ? Colors.grey[850] : Colors.grey[200],
-                                                    child: const Icon(Icons.broken_image, size: 20, color: Colors.grey),
-                                                  ),
-                                                )
-                                              : Container(
-                                                  color: isDark ? Colors.grey[850] : Colors.grey[200],
-                                                  child: const Icon(Icons.menu_book, size: 20, color: Colors.grey),
-                                                ),
-                                        ),
-                                      ),
-                                      const SizedBox(width: 14),
-                                      Expanded(
-                                        child: Column(
-                                          crossAxisAlignment: CrossAxisAlignment.start,
-                                          children: [
-                                            Text(
-                                              title,
-                                              style: TextStyle(
-                                                fontSize: 14,
-                                                fontWeight: FontWeight.bold,
-                                                color: isDark ? Colors.white : AppColors.textLight,
-                                              ),
-                                              maxLines: 1,
-                                              overflow: TextOverflow.ellipsis,
-                                            ),
-                                            const SizedBox(height: 2),
-                                            Text(
-                                              author,
-                                              style: TextStyle(
-                                                fontSize: 12,
-                                                color: isDark ? Colors.white54 : Colors.grey.shade600,
-                                              ),
-                                              maxLines: 1,
-                                              overflow: TextOverflow.ellipsis,
-                                            ),
-                                            const SizedBox(height: 8),
-                                            Wrap(
-                                              spacing: 6,
-                                              runSpacing: 4,
-                                              children: [
-                                                _buildStatBadge(
-                                                  icon: Icons.task_alt_rounded,
-                                                  label: '$completedCount ch',
-                                                  color: const Color(0xFF10B981),
-                                                  isDark: isDark,
-                                                ),
-                                                _buildStatBadge(
-                                                  icon: Icons.timer_outlined,
-                                                  label: _formatReadingTime(p.totalReadingTime),
-                                                  color: const Color(0xFFF59E0B),
-                                                  isDark: isDark,
-                                                ),
-                                                _buildStatBadge(
-                                                  icon: Icons.history_rounded,
-                                                  label: timeAgo(p.lastReadAt),
-                                                  color: const Color(0xFF64748B),
-                                                  isDark: isDark,
-                                                ),
-                                              ],
-                                            ),
-                                          ],
-                                        ),
-                                      ),
-                                      Icon(
-                                        Icons.chevron_right_rounded,
-                                        color: isDark ? Colors.white30 : Colors.grey.shade400,
-                                        size: 20,
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              );
-                            },
-                          ),
-                  ),
-                ],
-              ),
-            );
-          },
-        );
-      },
+    ReadingStatsBottomSheet.show(
+      context,
+      progressions: _progressions,
+      mangaDetailsMap: _mangaDetailsMap,
+      onNavigateToDetail: _navigateToDetail,
     );
   }
 
   void _showTimeSpentDialog() {
     HapticFeedback.selectionClick();
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final primary = Theme.of(context).colorScheme.primary;
-
-    final sortedList = List<MangaProgression>.from(_progressions)
-      ..sort((a, b) => b.totalReadingTime.compareTo(a.totalReadingTime));
-
-    final avgPerManga = _progressions.isNotEmpty
-        ? (_totalReadingTimeSeconds / _progressions.length).round()
-        : 0;
-    final avgPerChapter = _totalChaptersRead > 0
-        ? (_totalReadingTimeSeconds / _totalChaptersRead).round()
-        : 0;
-
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (context) {
-        return Container(
-          height: MediaQuery.of(context).size.height * 0.85,
-          decoration: BoxDecoration(
-            color: isDark ? const Color(0xFF1E293B) : Colors.white,
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.3),
-                blurRadius: 24,
-                offset: const Offset(0, -4),
-              ),
-            ],
-          ),
-          child: Column(
-            children: [
-              _buildSheetHandle(isDark),
-              _buildSheetHeader(
-                context,
-                title: 'Time Spent Reading',
-                subtitle: 'Analytics and duration breakdown',
-                icon: Icons.access_time_filled_rounded,
-                iconColor: const Color(0xFFF59E0B),
-              ),
-              Expanded(
-                child: ListView(
-                  padding: const EdgeInsets.fromLTRB(20, 12, 20, 32),
-                  children: [
-                    // Hero Total Card
-                    Container(
-                      padding: const EdgeInsets.all(20),
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          colors: [
-                            primary,
-                            AppColors.secondary,
-                          ],
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                        ),
-                        borderRadius: BorderRadius.circular(20),
-                        boxShadow: [
-                          BoxShadow(
-                            color: primary.withValues(alpha: 0.35),
-                            blurRadius: 16,
-                            offset: const Offset(0, 6),
-                          ),
-                        ],
-                      ),
-                      child: Column(
-                        children: [
-                          const Text(
-                            'TOTAL READING DURATION',
-                            style: TextStyle(
-                              fontSize: 11,
-                              fontWeight: FontWeight.w700,
-                              letterSpacing: 1.2,
-                              color: Colors.white70,
-                            ),
-                          ),
-                          const SizedBox(height: 6),
-                          Text(
-                            _formatReadingTime(_totalReadingTimeSeconds),
-                            style: const TextStyle(
-                              fontSize: 32,
-                              fontWeight: FontWeight.w900,
-                              color: Colors.white,
-                              letterSpacing: -0.5,
-                            ),
-                          ),
-                          const SizedBox(height: 16),
-                          Row(
-                            children: [
-                              Expanded(
-                                child: Container(
-                                  padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
-                                  decoration: BoxDecoration(
-                                    color: Colors.white.withValues(alpha: 0.15),
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
-                                  child: Column(
-                                    children: [
-                                      Text(
-                                        _formatReadingTime(avgPerManga),
-                                        style: const TextStyle(
-                                          fontSize: 15,
-                                          fontWeight: FontWeight.bold,
-                                          color: Colors.white,
-                                        ),
-                                      ),
-                                      const SizedBox(height: 2),
-                                      const Text(
-                                        'Avg / Title',
-                                        style: TextStyle(fontSize: 11, color: Colors.white70),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(width: 10),
-                              Expanded(
-                                child: Container(
-                                  padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
-                                  decoration: BoxDecoration(
-                                    color: Colors.white.withValues(alpha: 0.15),
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
-                                  child: Column(
-                                    children: [
-                                      Text(
-                                        _formatReadingTime(avgPerChapter),
-                                        style: const TextStyle(
-                                          fontSize: 15,
-                                          fontWeight: FontWeight.bold,
-                                          color: Colors.white,
-                                        ),
-                                      ),
-                                      const SizedBox(height: 2),
-                                      const Text(
-                                        'Avg / Chapter',
-                                        style: TextStyle(fontSize: 11, color: Colors.white70),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 24),
-                    Text(
-                      'BREAKDOWN BY TITLE',
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.bold,
-                        letterSpacing: 1.1,
-                        color: isDark ? Colors.white54 : Colors.grey.shade600,
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    if (sortedList.isEmpty)
-                      _buildEmptyStatsState(
-                        isDark: isDark,
-                        icon: Icons.timer_outlined,
-                        title: 'No time tracking yet',
-                        description: 'Reading time will be tracked when reading chapters.',
-                      )
-                    else
-                      ...List.generate(sortedList.length, (index) {
-                        final p = sortedList[index];
-                        final mangaInfo = _mangaDetailsMap[p.mangaId];
-                        final title = mangaInfo?['title'] ?? p.manga?.title ?? 'Manga #${p.mangaId}';
-                        final localImg = mangaInfo?['localImageUrl'] ?? p.manga?.localImageUrl;
-                        final remoteImg = mangaInfo?['imageUrl'] ?? p.manga?.imageUrl;
-                        final imageUrl = _apiService.getLocalImageUrl(localImg, remoteImg);
-                        final fraction = _totalReadingTimeSeconds > 0
-                            ? (p.totalReadingTime / _totalReadingTimeSeconds).clamp(0.0, 1.0)
-                            : 0.0;
-                        final percentage = (fraction * 100).toStringAsFixed(1);
-
-                        Color rankColor;
-                        if (index == 0) {
-                          rankColor = const Color(0xFFF59E0B);
-                        } else if (index == 1) {
-                          rankColor = const Color(0xFF94A3B8);
-                        } else if (index == 2) {
-                          rankColor = const Color(0xFFD97706);
-                        } else {
-                          rankColor = isDark ? Colors.white38 : Colors.grey.shade400;
-                        }
-
-                        return Container(
-                          margin: const EdgeInsets.only(bottom: 12),
-                          decoration: BoxDecoration(
-                            color: isDark
-                                ? Colors.white.withValues(alpha: 0.04)
-                                : const Color(0xFFF8FAFC),
-                            borderRadius: BorderRadius.circular(16),
-                            border: Border.all(
-                              color: isDark
-                                  ? Colors.white.withValues(alpha: 0.06)
-                                  : const Color(0xFFE2E8F0),
-                            ),
-                          ),
-                          child: InkWell(
-                            onTap: () {
-                              Navigator.pop(context);
-                              _navigateToDetail(p.mangaId);
-                            },
-                            borderRadius: BorderRadius.circular(16),
-                            child: Padding(
-                              padding: const EdgeInsets.all(12),
-                              child: Column(
-                                children: [
-                                  Row(
-                                    children: [
-                                      Container(
-                                        width: 28,
-                                        height: 28,
-                                        alignment: Alignment.center,
-                                        decoration: BoxDecoration(
-                                          color: rankColor.withValues(alpha: isDark ? 0.2 : 0.12),
-                                          shape: BoxShape.circle,
-                                        ),
-                                        child: Text(
-                                          '#${index + 1}',
-                                          style: TextStyle(
-                                            fontSize: 12,
-                                            fontWeight: FontWeight.bold,
-                                            color: rankColor,
-                                          ),
-                                        ),
-                                      ),
-                                      const SizedBox(width: 10),
-                                      ClipRRect(
-                                        borderRadius: BorderRadius.circular(8),
-                                        child: SizedBox(
-                                          width: 38,
-                                          height: 52,
-                                          child: imageUrl.isNotEmpty
-                                              ? CachedNetworkImage(
-                                                  imageUrl: imageUrl,
-                                                  fit: BoxFit.cover,
-                                                  memCacheWidth: 120,
-                                                  placeholder: (_, _) => Container(
-                                                    color: isDark ? Colors.grey[850] : Colors.grey[200],
-                                                  ),
-                                                  errorBuilder: (_, _, _) => Container(
-                                                    color: isDark ? Colors.grey[850] : Colors.grey[200],
-                                                    child: const Icon(Icons.broken_image, size: 16),
-                                                  ),
-                                                )
-                                              : Container(
-                                                  color: isDark ? Colors.grey[850] : Colors.grey[200],
-                                                  child: const Icon(Icons.menu_book, size: 16),
-                                                ),
-                                        ),
-                                      ),
-                                      const SizedBox(width: 12),
-                                      Expanded(
-                                        child: Column(
-                                          crossAxisAlignment: CrossAxisAlignment.start,
-                                          children: [
-                                            Text(
-                                              title,
-                                              style: TextStyle(
-                                                fontSize: 14,
-                                                fontWeight: FontWeight.bold,
-                                                color: isDark ? Colors.white : AppColors.textLight,
-                                              ),
-                                              maxLines: 1,
-                                              overflow: TextOverflow.ellipsis,
-                                            ),
-                                            const SizedBox(height: 4),
-                                            Text(
-                                              '$percentage% of total reading time',
-                                              style: TextStyle(
-                                                fontSize: 11,
-                                                color: isDark ? Colors.white54 : Colors.grey.shade600,
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                      ),
-                                      const SizedBox(width: 8),
-                                      Text(
-                                        _formatReadingTime(p.totalReadingTime),
-                                        style: TextStyle(
-                                          fontSize: 14,
-                                          fontWeight: FontWeight.w800,
-                                          color: isDark ? Colors.white : AppColors.textLight,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                  const SizedBox(height: 10),
-                                  ClipRRect(
-                                    borderRadius: BorderRadius.circular(4),
-                                    child: LinearProgressIndicator(
-                                      value: fraction,
-                                      minHeight: 5,
-                                      backgroundColor: isDark
-                                          ? Colors.white.withValues(alpha: 0.08)
-                                          : Colors.grey.shade200,
-                                      valueColor: AlwaysStoppedAnimation<Color>(
-                                        index == 0 ? const Color(0xFFF59E0B) : primary,
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
-                        );
-                      }),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        );
-      },
+    TimeSpentBottomSheet.show(
+      context,
+      progressions: _progressions,
+      mangaDetailsMap: _mangaDetailsMap,
+      onNavigateToDetail: _navigateToDetail,
     );
   }
 
   void _showChaptersReadDialog() {
     HapticFeedback.selectionClick();
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final primary = Theme.of(context).colorScheme.primary;
-
-    final completedLogs = <Map<String, dynamic>>[];
-    for (final p in _progressions) {
-      final mangaInfo = _mangaDetailsMap[p.mangaId];
-      final mangaTitle = mangaInfo?['title'] ?? p.manga?.title ?? 'Manga #${p.mangaId}';
-      final localImg = mangaInfo?['localImageUrl'] ?? p.manga?.localImageUrl;
-      final remoteImg = mangaInfo?['imageUrl'] ?? p.manga?.imageUrl;
-
-      for (final log in p.chapterLogs) {
-        if (log.isCompleted) {
-          completedLogs.add({
-            'mangaId': p.mangaId,
-            'mangaTitle': mangaTitle,
-            'localImageUrl': localImg,
-            'imageUrl': remoteImg,
-            'chapterNumber': log.chapterNumber,
-            'lastReadAt': log.lastReadAt,
-            'readingTimeSeconds': log.readingTimeSeconds,
-          });
-        }
-      }
-    }
-
-    completedLogs.sort(
-      (a, b) => (b['lastReadAt'] as DateTime).compareTo(a['lastReadAt'] as DateTime),
-    );
-
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (context) {
-        String viewMode = 'timeline';
-
-        return StatefulBuilder(
-          builder: (context, setModalState) {
-            final groupedMap = <String, List<Map<String, dynamic>>>{};
-            for (final item in completedLogs) {
-              final mangaId = item['mangaId'] as String;
-              groupedMap.putIfAbsent(mangaId, () => []).add(item);
-            }
-
-            final groupedList = groupedMap.entries.toList()
-              ..sort((a, b) => b.value.length.compareTo(a.value.length));
-
-            return Container(
-              height: MediaQuery.of(context).size.height * 0.85,
-              decoration: BoxDecoration(
-                color: isDark ? const Color(0xFF1E293B) : Colors.white,
-                borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.3),
-                    blurRadius: 24,
-                    offset: const Offset(0, -4),
-                  ),
-                ],
-              ),
-              child: Column(
-                children: [
-                  _buildSheetHandle(isDark),
-                  _buildSheetHeader(
-                    context,
-                    title: 'Chapters Completed',
-                    subtitle: '${completedLogs.length} total chapters read',
-                    icon: Icons.checklist_rounded,
-                    iconColor: const Color(0xFF10B981),
-                  ),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-                    child: Row(
-                      children: [
-                        _buildFilterChip(
-                          label: 'Timeline (${completedLogs.length})',
-                          isSelected: viewMode == 'timeline',
-                          onTap: () => setModalState(() => viewMode = 'timeline'),
-                          isDark: isDark,
-                          primary: primary,
-                        ),
-                        const SizedBox(width: 8),
-                        _buildFilterChip(
-                          label: 'By Manga (${groupedList.length})',
-                          isSelected: viewMode == 'grouped',
-                          onTap: () => setModalState(() => viewMode = 'grouped'),
-                          isDark: isDark,
-                          primary: primary,
-                        ),
-                      ],
-                    ),
-                  ),
-                  const Divider(height: 1),
-                  Expanded(
-                    child: completedLogs.isEmpty
-                        ? _buildEmptyStatsState(
-                            isDark: isDark,
-                            icon: Icons.check_circle_outline_rounded,
-                            title: 'No chapters completed',
-                            description: 'Finish reading chapters to see your completion history.',
-                          )
-                        : (viewMode == 'timeline'
-                            ? ListView.separated(
-                                padding: const EdgeInsets.fromLTRB(20, 16, 20, 32),
-                                itemCount: completedLogs.length,
-                                separatorBuilder: (_, _) => const SizedBox(height: 10),
-                                itemBuilder: (context, index) {
-                                  final item = completedLogs[index];
-                                  final date = item['lastReadAt'] as DateTime;
-                                  final mangaId = item['mangaId'] as String;
-                                  final imageUrl = _apiService.getLocalImageUrl(
-                                    item['localImageUrl'],
-                                    item['imageUrl'],
-                                  );
-                                  final readSeconds = item['readingTimeSeconds'] as int;
-
-                                  return InkWell(
-                                    onTap: () {
-                                      Navigator.pop(context);
-                                      _navigateToDetail(mangaId);
-                                    },
-                                    borderRadius: BorderRadius.circular(14),
-                                    child: Container(
-                                      padding: const EdgeInsets.all(12),
-                                      decoration: BoxDecoration(
-                                        color: isDark
-                                            ? Colors.white.withValues(alpha: 0.04)
-                                            : const Color(0xFFF8FAFC),
-                                        borderRadius: BorderRadius.circular(14),
-                                        border: Border.all(
-                                          color: isDark
-                                              ? Colors.white.withValues(alpha: 0.06)
-                                              : const Color(0xFFE2E8F0),
-                                        ),
-                                      ),
-                                      child: Row(
-                                        children: [
-                                          ClipRRect(
-                                            borderRadius: BorderRadius.circular(8),
-                                            child: SizedBox(
-                                              width: 44,
-                                              height: 60,
-                                              child: imageUrl.isNotEmpty
-                                                  ? CachedNetworkImage(
-                                                      imageUrl: imageUrl,
-                                                      fit: BoxFit.cover,
-                                                      memCacheWidth: 120,
-                                                      placeholder: (_, _) => Container(
-                                                        color: isDark ? Colors.grey[850] : Colors.grey[200],
-                                                      ),
-                                                      errorBuilder: (_, _, _) => Container(
-                                                        color: isDark ? Colors.grey[850] : Colors.grey[200],
-                                                        child: const Icon(Icons.broken_image, size: 16),
-                                                      ),
-                                                    )
-                                                  : Container(
-                                                      color: isDark ? Colors.grey[850] : Colors.grey[200],
-                                                      child: const Icon(Icons.menu_book, size: 16),
-                                                    ),
-                                            ),
-                                          ),
-                                          const SizedBox(width: 12),
-                                          Expanded(
-                                            child: Column(
-                                              crossAxisAlignment: CrossAxisAlignment.start,
-                                              children: [
-                                                Text(
-                                                  '${item['mangaTitle']}',
-                                                  maxLines: 1,
-                                                  overflow: TextOverflow.ellipsis,
-                                                  style: TextStyle(
-                                                    fontSize: 14,
-                                                    fontWeight: FontWeight.bold,
-                                                    color: isDark ? Colors.white : AppColors.textLight,
-                                                  ),
-                                                ),
-                                                const SizedBox(height: 4),
-                                                Row(
-                                                  children: [
-                                                    Container(
-                                                      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
-                                                      decoration: BoxDecoration(
-                                                        color: const Color(0xFF10B981).withValues(alpha: isDark ? 0.2 : 0.12),
-                                                        borderRadius: BorderRadius.circular(6),
-                                                      ),
-                                                      child: Row(
-                                                        mainAxisSize: MainAxisSize.min,
-                                                        children: [
-                                                          const Icon(Icons.check, size: 12, color: Color(0xFF10B981)),
-                                                          const SizedBox(width: 3),
-                                                          Text(
-                                                            'Ch. ${item['chapterNumber']}',
-                                                            style: const TextStyle(
-                                                              fontSize: 11,
-                                                              fontWeight: FontWeight.w700,
-                                                              color: Color(0xFF10B981),
-                                                            ),
-                                                          ),
-                                                        ],
-                                                      ),
-                                                    ),
-                                                    if (readSeconds > 0) ...[
-                                                      const SizedBox(width: 6),
-                                                      Text(
-                                                        '• ${_formatReadingTime(readSeconds)}',
-                                                        style: TextStyle(
-                                                          fontSize: 11,
-                                                          color: isDark ? Colors.white54 : Colors.grey.shade600,
-                                                        ),
-                                                      ),
-                                                    ],
-                                                  ],
-                                                ),
-                                              ],
-                                            ),
-                                          ),
-                                          Text(
-                                            timeAgo(date),
-                                            style: TextStyle(
-                                              fontSize: 11,
-                                              color: isDark ? Colors.white38 : Colors.grey.shade500,
-                                              fontWeight: FontWeight.w500,
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                  );
-                                },
-                              )
-                            : ListView.separated(
-                                padding: const EdgeInsets.fromLTRB(20, 16, 20, 32),
-                                itemCount: groupedList.length,
-                                separatorBuilder: (_, _) => const SizedBox(height: 10),
-                                itemBuilder: (context, index) {
-                                  final entry = groupedList[index];
-                                  final mangaId = entry.key;
-                                  final logs = entry.value;
-                                  final firstItem = logs.first;
-                                  final mangaTitle = firstItem['mangaTitle'] as String;
-                                  final imageUrl = _apiService.getLocalImageUrl(
-                                    firstItem['localImageUrl'],
-                                    firstItem['imageUrl'],
-                                  );
-
-                                  return InkWell(
-                                    onTap: () {
-                                      Navigator.pop(context);
-                                      _navigateToDetail(mangaId);
-                                    },
-                                    borderRadius: BorderRadius.circular(14),
-                                    child: Container(
-                                      padding: const EdgeInsets.all(12),
-                                      decoration: BoxDecoration(
-                                        color: isDark
-                                            ? Colors.white.withValues(alpha: 0.04)
-                                            : const Color(0xFFF8FAFC),
-                                        borderRadius: BorderRadius.circular(14),
-                                        border: Border.all(
-                                          color: isDark
-                                              ? Colors.white.withValues(alpha: 0.06)
-                                              : const Color(0xFFE2E8F0),
-                                        ),
-                                      ),
-                                      child: Row(
-                                        children: [
-                                          ClipRRect(
-                                            borderRadius: BorderRadius.circular(8),
-                                            child: SizedBox(
-                                              width: 44,
-                                              height: 60,
-                                              child: imageUrl.isNotEmpty
-                                                  ? CachedNetworkImage(
-                                                      imageUrl: imageUrl,
-                                                      fit: BoxFit.cover,
-                                                      memCacheWidth: 120,
-                                                      placeholder: (_, _) => Container(
-                                                        color: isDark ? Colors.grey[850] : Colors.grey[200],
-                                                      ),
-                                                      errorBuilder: (_, _, _) => Container(
-                                                        color: isDark ? Colors.grey[850] : Colors.grey[200],
-                                                        child: const Icon(Icons.broken_image, size: 16),
-                                                      ),
-                                                    )
-                                                  : Container(
-                                                      color: isDark ? Colors.grey[850] : Colors.grey[200],
-                                                      child: const Icon(Icons.menu_book, size: 16),
-                                                    ),
-                                            ),
-                                          ),
-                                          const SizedBox(width: 12),
-                                          Expanded(
-                                            child: Column(
-                                              crossAxisAlignment: CrossAxisAlignment.start,
-                                              children: [
-                                                Text(
-                                                  mangaTitle,
-                                                  maxLines: 1,
-                                                  overflow: TextOverflow.ellipsis,
-                                                  style: TextStyle(
-                                                    fontSize: 14,
-                                                    fontWeight: FontWeight.bold,
-                                                    color: isDark ? Colors.white : AppColors.textLight,
-                                                  ),
-                                                ),
-                                                const SizedBox(height: 4),
-                                                Text(
-                                                  '${logs.length} chapter${logs.length > 1 ? 's' : ''} completed',
-                                                  style: const TextStyle(
-                                                    fontSize: 12,
-                                                    color: Color(0xFF10B981),
-                                                    fontWeight: FontWeight.w600,
-                                                  ),
-                                                ),
-                                              ],
-                                            ),
-                                          ),
-                                          Icon(
-                                            Icons.chevron_right_rounded,
-                                            color: isDark ? Colors.white30 : Colors.grey.shade400,
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                  );
-                                },
-                              )),
-                  ),
-                ],
-              ),
-            );
-          },
-        );
-      },
-    );
-  }
-
-  Widget _buildSheetHandle(bool isDark) {
-    return Container(
-      width: 40,
-      height: 4,
-      margin: const EdgeInsets.only(top: 12, bottom: 8),
-      decoration: BoxDecoration(
-        color: (isDark ? Colors.white : Colors.black).withValues(alpha: 0.2),
-        borderRadius: BorderRadius.circular(2),
-      ),
-    );
-  }
-
-  Widget _buildSheetHeader(
-    BuildContext context, {
-    required String title,
-    required String subtitle,
-    required IconData icon,
-    required Color iconColor,
-  }) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 8, 12, 12),
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: iconColor.withValues(alpha: isDark ? 0.2 : 0.12),
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: Icon(icon, color: iconColor, size: 20),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  style: TextStyle(
-                    fontSize: 17,
-                    fontWeight: FontWeight.bold,
-                    color: isDark ? Colors.white : AppColors.textLight,
-                  ),
-                ),
-                Text(
-                  subtitle,
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: isDark ? Colors.white54 : Colors.grey.shade600,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          IconButton(
-            onPressed: () => Navigator.pop(context),
-            icon: const Icon(Icons.close_rounded),
-            color: isDark ? Colors.white60 : Colors.grey.shade600,
-            tooltip: 'Close',
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildFilterChip({
-    required String label,
-    required bool isSelected,
-    required VoidCallback onTap,
-    required bool isDark,
-    required Color primary,
-  }) {
-    return InkWell(
-      onTap: () {
-        HapticFeedback.selectionClick();
-        onTap();
-      },
-      borderRadius: BorderRadius.circular(20),
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 180),
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-        decoration: BoxDecoration(
-          color: isSelected
-              ? primary
-              : (isDark ? Colors.white.withValues(alpha: 0.05) : const Color(0xFFF1F5F9)),
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(
-            color: isSelected
-                ? primary
-                : (isDark ? Colors.white.withValues(alpha: 0.08) : const Color(0xFFE2E8F0)),
-          ),
-        ),
-        child: Text(
-          label,
-          style: TextStyle(
-            fontSize: 12,
-            fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
-            color: isSelected
-                ? Colors.white
-                : (isDark ? Colors.white70 : const Color(0xFF475569)),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildStatBadge({
-    required IconData icon,
-    required String label,
-    required Color color,
-    required bool isDark,
-  }) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2.5),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: isDark ? 0.15 : 0.08),
-        borderRadius: BorderRadius.circular(6),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 11, color: color),
-          const SizedBox(width: 3),
-          Text(
-            label,
-            style: TextStyle(
-              fontSize: 10.5,
-              fontWeight: FontWeight.w600,
-              color: color,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildEmptyStatsState({
-    required bool isDark,
-    required IconData icon,
-    required String title,
-    required String description,
-  }) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(32),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: isDark ? Colors.white.withValues(alpha: 0.05) : const Color(0xFFF1F5F9),
-                shape: BoxShape.circle,
-              ),
-              child: Icon(
-                icon,
-                size: 40,
-                color: isDark ? Colors.white38 : Colors.grey.shade400,
-              ),
-            ),
-            const SizedBox(height: 16),
-            Text(
-              title,
-              style: TextStyle(
-                fontSize: 15,
-                fontWeight: FontWeight.bold,
-                color: isDark ? Colors.white : AppColors.textLight,
-              ),
-            ),
-            const SizedBox(height: 6),
-            Text(
-              description,
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                fontSize: 13,
-                color: isDark ? Colors.white54 : Colors.grey.shade600,
-                height: 1.4,
-              ),
-            ),
-          ],
-        ),
-      ),
+    ChaptersReadBottomSheet.show(
+      context,
+      progressions: _progressions,
+      mangaDetailsMap: _mangaDetailsMap,
+      onNavigateToDetail: _navigateToDetail,
     );
   }
 
@@ -2164,9 +1232,11 @@ class _MoreScreenState extends State<MoreScreen>
                   style: const TextStyle(fontSize: 12, color: Colors.grey),
                 )
               : null,
-          trailing: const Icon(Icons.chevron_right, color: Colors.grey, size: 20),
+          trailing:
+              const Icon(Icons.chevron_right, color: Colors.grey, size: 20),
           onTap: onTap,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         ),
       ),
     );
@@ -2211,7 +1281,8 @@ class _MoreScreenState extends State<MoreScreen>
           onTap: _handleVersionTap,
           behavior: HitTestBehavior.opaque,
           child: Padding(
-            padding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 16.0),
+            padding:
+                const EdgeInsets.symmetric(vertical: 8.0, horizontal: 16.0),
             child: Text(
               'App Version $_appVersion',
               style: const TextStyle(color: Colors.grey, fontSize: 12),
