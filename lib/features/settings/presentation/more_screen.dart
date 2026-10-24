@@ -3,7 +3,6 @@ import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:package_info_plus/package_info_plus.dart';
-import 'package:url_launcher/url_launcher.dart';
 import 'package:cached_network_image_ce/cached_network_image.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/di/injection.dart';
@@ -25,6 +24,7 @@ import '../services/update_service.dart';
 import 'base_api_setting_screen.dart';
 import 'storage_setting_screen.dart';
 import 'theme_setting_screen.dart';
+import 'widgets/app_update_dialog.dart';
 
 class MoreScreen extends StatefulWidget {
   const MoreScreen({super.key});
@@ -293,71 +293,7 @@ class _MoreScreenState extends State<MoreScreen>
   }
 
   void _showUpdateDialog(Map<String, dynamic> updateData) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(20),
-        ),
-        title: Row(
-          children: [
-            Icon(Icons.system_update_rounded, color: AppColors.primary),
-            const SizedBox(width: 10),
-            const Text(
-              'Update Available!',
-              style: TextStyle(fontWeight: FontWeight.bold),
-            ),
-          ],
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'A new version (${updateData['version']}) is available.',
-              style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
-            ),
-            const SizedBox(height: 12),
-            Container(
-              constraints: const BoxConstraints(maxHeight: 180),
-              child: SingleChildScrollView(
-                child: Text(
-                  updateData['body'] ?? 'Performance improvements and bug fixes.',
-                  style: TextStyle(
-                    fontSize: 13,
-                    color: Theme.of(context).brightness == Brightness.dark
-                        ? Colors.white70
-                        : Colors.grey.shade700,
-                    height: 1.4,
-                  ),
-                ),
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Later'),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              Navigator.pop(context);
-              final url = Uri.parse(updateData['url']);
-              launchUrl(url, mode: LaunchMode.externalApplication);
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.primary,
-              foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-            ),
-            child: const Text('Update Now'),
-          ),
-        ],
-      ),
-    );
+    AppUpdateDialog.show(context, updateData);
   }
 
   @override
