@@ -27,9 +27,12 @@ class ReaderController extends ChangeNotifier {
   late double _currentChapterNumber;
   final Map<int, double> _pageAspectRatios = {};
 
-  int _currentPage = 1;
-  double _progress = 0.0;
+  final ValueNotifier<int> _currentPageNotifier = ValueNotifier<int>(1);
+  final ValueNotifier<double> _progressNotifier = ValueNotifier<double>(0.0);
+  final ValueNotifier<double> _accumulatedBottomOverscrollNotifier =
+      ValueNotifier<double>(0.0);
   double _targetProgress = 0.0;
+  String? _errorMessage;
 
   bool _showUI = true;
   bool _isLoading = false;
@@ -40,7 +43,6 @@ class ReaderController extends ChangeNotifier {
   bool _isSliderScrolling = false;
   bool _isRestoringScroll = false;
   bool _isJumpingToPage = false;
-  double _accumulatedBottomOverscroll = 0.0;
 
   bool _isAutoScrolling = false;
   double _autoScrollSpeed = 1.0;
@@ -54,15 +56,24 @@ class ReaderController extends ChangeNotifier {
   late DateTime _sessionStartTime;
   CancelToken? _chapterCancelToken;
 
-  // Getters
+  // Getters & ValueNotifiers for isolated sub-tree rendering
   ReaderContent get content => _content;
   List<String> get pageUrls => _pageUrls;
   String get chapterId => _chapterId;
   double get currentChapterNumber => _currentChapterNumber;
   Map<int, double> get pageAspectRatios => _pageAspectRatios;
-  int get currentPage => _currentPage;
-  double get progress => _progress;
+
+  ValueNotifier<int> get currentPageNotifier => _currentPageNotifier;
+  ValueNotifier<double> get progressNotifier => _progressNotifier;
+  ValueNotifier<double> get accumulatedBottomOverscrollNotifier =>
+      _accumulatedBottomOverscrollNotifier;
+
+  int get currentPage => _currentPageNotifier.value;
+  double get progress => _progressNotifier.value;
+  double get accumulatedBottomOverscroll =>
+      _accumulatedBottomOverscrollNotifier.value;
   double get targetProgress => _targetProgress;
+  String? get errorMessage => _errorMessage;
 
   bool get showUI => _showUI;
   bool get isLoading => _isLoading;
@@ -70,7 +81,6 @@ class ReaderController extends ChangeNotifier {
   bool get isSliderScrolling => _isSliderScrolling;
   bool get isRestoringScroll => _isRestoringScroll;
   bool get isJumpingToPage => _isJumpingToPage;
-  double get accumulatedBottomOverscroll => _accumulatedBottomOverscroll;
 
   bool get isAutoScrolling => _isAutoScrolling;
   double get autoScrollSpeed => _autoScrollSpeed;
@@ -113,9 +123,12 @@ class ReaderController extends ChangeNotifier {
     if (_content.currentPage > 1 &&
         _content.currentPage <= _pageUrls.length) {
       _isRestoringScroll = true;
-      _currentPage = _content.currentPage;
+      _currentPageNotifier.value = _content.currentPage;
       _targetProgress = (_content.currentPage - 1) / (_pageUrls.length - 1);
-      _progress = _targetProgress;
+      _progressNotifier.value = _targetProgress;
+    } else {
+      _currentPageNotifier.value = 1;
+      _progressNotifier.value = 0.0;
     }
 
     _sessionStartTime = DateTime.now();
@@ -292,17 +305,36 @@ class ReaderController extends ChangeNotifier {
   }
 
   void setAccumulatedBottomOverscroll(double value) {
-    _accumulatedBottomOverscroll = value;
+    if (_accumulatedBottomOverscrollNotifier.value != value) {
+      _accumulatedBottomOverscrollNotifier.value = value;
+    }
   }
 
   void addAccumulatedBottomOverscroll(double delta) {
-    _accumulatedBottomOverscroll += delta;
+    _accumulatedBottomOverscrollNotifier.value += delta;
   }
 
-  void updatePageAndProgress(int page, double progress) {
-    _currentPage = page;
-    _progress = progress;
-    _safeNotifyListeners();
+  void clearError() {
+    if (_errorMessage != null) {
+      _errorMessage = null;
+      _safeNotifyListeners();
+    }
+  }
+
+  /// Isolated update for scroll and slider events without triggering full screen rebuilds!
+  void updatePageAndProgress(int page, double progress, {bool notifyController = false}) {
+    bool changed = false;
+    if (_currentPageNotifier.value != page) {
+      _currentPageNotifier.value = page;
+      changed = true;
+    }
+    if (_progressNotifier.value != progress) {
+      _progressNotifier.value = progress;
+      changed = true;
+    }
+    if (notifyController && changed) {
+      _safeNotifyListeners();
+    }
   }
 
   void debounceSaveProgression({Function(String message)? onError}) {
@@ -321,7 +353,7 @@ class ReaderController extends ChangeNotifier {
   Future<void> saveProgression({Function(String message)? onError}) async {
     if (_progressionService == null) return;
     final isCompleted =
-        _pageUrls.isNotEmpty && _currentPage >= _pageUrls.length;
+        _pageUrls.isNotEmpty && currentPage >= _pageUrls.length;
 
     final now = DateTime.now();
     final sessionSeconds = now.difference(_sessionStartTime).inSeconds;
@@ -344,7 +376,7 @@ class ReaderController extends ChangeNotifier {
           id: existingLog.id,
           chapterId: _chapterId,
           chapterNumber: _currentChapterNumber,
-          lastReadPage: _currentPage,
+          lastReadPage: currentPage,
           totalPages: _pageUrls.length,
           isCompleted: isCompleted,
           readingTimeSeconds: _chapterInitialReadingTimeSeconds,
@@ -356,7 +388,7 @@ class ReaderController extends ChangeNotifier {
             id: '',
             chapterId: _chapterId,
             chapterNumber: _currentChapterNumber,
-            lastReadPage: _currentPage,
+            lastReadPage: currentPage,
             totalPages: _pageUrls.length,
             isCompleted: isCompleted,
             readingTimeSeconds: _chapterInitialReadingTimeSeconds,
@@ -374,7 +406,7 @@ class ReaderController extends ChangeNotifier {
         totalReadingTime: existingProgression?.totalReadingTime ?? 0,
         chapterId: _chapterId,
         currentChapter: _currentChapterNumber,
-        currentPage: _currentPage,
+        currentPage: currentPage,
         totalPages: _pageUrls.length,
         isCompleted: isCompleted,
         readingTimeSeconds: _chapterInitialReadingTimeSeconds,
@@ -412,7 +444,7 @@ class ReaderController extends ChangeNotifier {
     }
 
     _isChangingChapter = true;
-    _accumulatedBottomOverscroll = 0.0;
+    _accumulatedBottomOverscrollNotifier.value = 0.0;
 
     _isLoading = true;
     _isRestoringScroll = true;
@@ -423,8 +455,8 @@ class ReaderController extends ChangeNotifier {
 
     if (next && _pageUrls.isNotEmpty) {
       cancelDebounceTimer();
-      _currentPage = _pageUrls.length;
-      _progress = 1.0;
+      _currentPageNotifier.value = _pageUrls.length;
+      _progressNotifier.value = 1.0;
       try {
         await saveProgression(onError: onError);
       } catch (e) {
@@ -450,7 +482,7 @@ class ReaderController extends ChangeNotifier {
     if (targetChapter.id == _chapterId) return;
 
     _isChangingChapter = true;
-    _accumulatedBottomOverscroll = 0.0;
+    _accumulatedBottomOverscrollNotifier.value = 0.0;
 
     _isLoading = true;
     _isRestoringScroll = true;
@@ -463,6 +495,30 @@ class ReaderController extends ChangeNotifier {
       targetChapter,
       initialPage: initialPage,
       onError: onError,
+      onLoaded: onLoaded,
+    );
+  }
+
+  Future<void> retryCurrentChapter({
+    Function(String message)? onError,
+    VoidCallback? onBeforeLoad,
+    VoidCallback? onLoaded,
+  }) async {
+    _errorMessage = null;
+    final currentChapter = _content.allChapters.firstWhere(
+      (c) => c.id == _chapterId,
+      orElse: () => Chapter(
+        id: _chapterId,
+        title: 'Chapter $_currentChapterNumber',
+        chapterNumber: _currentChapterNumber,
+        date: DateTime.now(),
+      ),
+    );
+    await loadChapter(
+      currentChapter,
+      initialPage: currentPage,
+      onError: onError,
+      onBeforeLoad: onBeforeLoad,
       onLoaded: onLoaded,
     );
   }
@@ -524,14 +580,15 @@ class ReaderController extends ChangeNotifier {
       _pageUrls = targetPageUrls;
       _chapterId = targetChapter.id;
       _currentChapterNumber = targetChapter.chapterNumber;
-      _progress = targetPageUrls.length > 1
+      _progressNotifier.value = targetPageUrls.length > 1
           ? (safeInitialPage - 1) / (targetPageUrls.length - 1)
           : 0.0;
-      _currentPage = safeInitialPage;
+      _currentPageNotifier.value = safeInitialPage;
       _isLoading = false;
       _isRestoringScroll = true;
       _isJumpingToPage = true;
-      _accumulatedBottomOverscroll = 0.0;
+      _accumulatedBottomOverscrollNotifier.value = 0.0;
+      _errorMessage = null;
       _safeNotifyListeners();
 
       onLoaded?.call();
@@ -544,7 +601,8 @@ class ReaderController extends ChangeNotifier {
       _isLoading = false;
       _isRestoringScroll = false;
       _isJumpingToPage = false;
-      _accumulatedBottomOverscroll = 0.0;
+      _accumulatedBottomOverscrollNotifier.value = 0.0;
+      _errorMessage = 'Failed to load chapter: $e';
       _safeNotifyListeners();
       onError?.call('Failed to load chapter: $e');
     } finally {
@@ -559,6 +617,9 @@ class ReaderController extends ChangeNotifier {
     _disposed = true;
     _chapterCancelToken?.cancel();
     _debounceTimer?.cancel();
+    _currentPageNotifier.dispose();
+    _progressNotifier.dispose();
+    _accumulatedBottomOverscrollNotifier.dispose();
     super.dispose();
   }
 }
