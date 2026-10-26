@@ -41,6 +41,7 @@ class _ReaderScreenState extends State<ReaderScreen>
 
   final Map<int, GlobalKey> _pageKeys = {};
   TapDownDetails? _doubleTapDetails;
+  double? _targetScrollOffset;
 
   @override
   void initState() {
@@ -349,6 +350,7 @@ class _ReaderScreenState extends State<ReaderScreen>
         }
       },
       onBeforeLoad: () {
+        _targetScrollOffset = null;
         _pageKeys.clear();
         _transformationController.value = Matrix4.identity();
         if (_scrollController.hasClients) {
@@ -392,6 +394,7 @@ class _ReaderScreenState extends State<ReaderScreen>
       targetChapter,
       initialPage: initialPage,
       onBeforeLoad: () {
+        _targetScrollOffset = null;
         _pageKeys.clear();
         _transformationController.value = Matrix4.identity();
         if (_scrollController.hasClients) {
@@ -432,6 +435,7 @@ class _ReaderScreenState extends State<ReaderScreen>
   void _retryChapter() {
     _controller.retryCurrentChapter(
       onBeforeLoad: () {
+        _targetScrollOffset = null;
         _pageKeys.clear();
         _transformationController.value = Matrix4.identity();
         if (_scrollController.hasClients) {
@@ -559,21 +563,21 @@ class _ReaderScreenState extends State<ReaderScreen>
     _animationController.forward();
   }
 
-  void _handleKeyboard(LogicalKeyboardKey key) {
+  bool _handleKeyboard(LogicalKeyboardKey key) {
     // Global actions
     if (key == LogicalKeyboardKey.keyF) {
       _controller.toggleFullscreen();
-      return;
+      return true;
     }
 
     if (key == LogicalKeyboardKey.space) {
       _toggleAutoScroll();
-      return;
+      return true;
     }
 
     if (key == LogicalKeyboardKey.slash || key == LogicalKeyboardKey.keyH) {
       ReaderShortcutsDialog.show(context);
-      return;
+      return true;
     }
 
     if (key == LogicalKeyboardKey.escape) {
@@ -582,45 +586,50 @@ class _ReaderScreenState extends State<ReaderScreen>
       } else {
         Navigator.pop(context);
       }
-      return;
+      return true;
     }
 
     if (key == LogicalKeyboardKey.bracketLeft) {
       _changeChapter(false);
-      return;
+      return true;
     }
 
     if (key == LogicalKeyboardKey.bracketRight) {
       _changeChapter(true);
-      return;
+      return true;
     }
 
     if (_controller.isWebtoonMode) {
-      if (!_scrollController.hasClients) return;
+      if (!_scrollController.hasClients) return false;
 
       const double scrollAmount = 200.0;
       final double pageAmount = MediaQuery.of(context).size.height * 0.8;
-      final double currentOffset = _scrollController.offset;
 
       if (key == LogicalKeyboardKey.arrowDown ||
           key == LogicalKeyboardKey.keyS) {
-        _scrollSmoothly(currentOffset + scrollAmount);
+        _scrollSmoothly(scrollAmount);
+        return true;
       } else if (key == LogicalKeyboardKey.arrowUp ||
           key == LogicalKeyboardKey.keyW) {
-        _scrollSmoothly(currentOffset - scrollAmount);
+        _scrollSmoothly(-scrollAmount);
+        return true;
       } else if (key == LogicalKeyboardKey.pageDown) {
-        _scrollSmoothly(currentOffset + pageAmount);
+        _scrollSmoothly(pageAmount);
+        return true;
       } else if (key == LogicalKeyboardKey.pageUp) {
-        _scrollSmoothly(currentOffset - pageAmount);
+        _scrollSmoothly(-pageAmount);
+        return true;
       } else if (key == LogicalKeyboardKey.arrowRight ||
           key == LogicalKeyboardKey.keyD) {
         _changeChapter(true);
+        return true;
       } else if (key == LogicalKeyboardKey.arrowLeft ||
           key == LogicalKeyboardKey.keyA) {
         _changeChapter(false);
+        return true;
       }
     } else {
-      if (!_pageController.hasClients) return;
+      if (!_pageController.hasClients) return false;
 
       final bool isForward = _controller.isRtlMode
           ? (key == LogicalKeyboardKey.arrowLeft ||
@@ -648,6 +657,7 @@ class _ReaderScreenState extends State<ReaderScreen>
         } else {
           _changeChapter(true);
         }
+        return true;
       } else if (isBackward) {
         if (_controller.currentPage > 1) {
           _pageController.animateToPage(
@@ -658,19 +668,32 @@ class _ReaderScreenState extends State<ReaderScreen>
         } else {
           _changeChapter(false);
         }
+        return true;
       }
     }
+
+    return false;
   }
 
-  void _scrollSmoothly(double target) {
-    final max = _scrollController.position.maxScrollExtent;
-    final min = _scrollController.position.minScrollExtent;
+  void _scrollSmoothly(double delta) {
+    if (!_scrollController.hasClients) return;
+    final position = _scrollController.position;
+    final max = position.maxScrollExtent;
+    final min = position.minScrollExtent;
+
+    final current = _targetScrollOffset ?? _scrollController.offset;
+    final target = (current + delta).clamp(min, max);
+    _targetScrollOffset = target;
 
     _scrollController.animateTo(
-      target.clamp(min, max),
-      duration: const Duration(milliseconds: 200),
+      target,
+      duration: const Duration(milliseconds: 180),
       curve: Curves.easeOutCubic,
-    );
+    ).whenComplete(() {
+      if (_targetScrollOffset == target) {
+        _targetScrollOffset = null;
+      }
+    });
   }
 
   void _onPageChanged(int index) {
@@ -764,8 +787,10 @@ class _ReaderScreenState extends State<ReaderScreen>
     return Focus(
       autofocus: true,
       onKeyEvent: (FocusNode node, KeyEvent event) {
-        if (event is KeyDownEvent) {
-          _handleKeyboard(event.logicalKey);
+        if (event is KeyDownEvent || event is KeyRepeatEvent) {
+          if (_handleKeyboard(event.logicalKey)) {
+            return KeyEventResult.handled;
+          }
         }
         return KeyEventResult.ignored;
       },
@@ -782,6 +807,7 @@ class _ReaderScreenState extends State<ReaderScreen>
               NotificationListener<ScrollNotification>(
                 onNotification: (notification) {
                   if (notification is UserScrollNotification) {
+                    _targetScrollOffset = null;
                     if (!_controller.isChangingChapter &&
                         !_controller.isLoading) {
                       _controller.setRestoringScroll(false);
@@ -790,6 +816,7 @@ class _ReaderScreenState extends State<ReaderScreen>
                   } else if (notification is OverscrollNotification) {
                     if (_controller.isWebtoonMode &&
                         notification.overscroll > 0 &&
+                        notification.dragDetails != null &&
                         notification.metrics.pixels >=
                             notification.metrics.maxScrollExtent &&
                         !_controller.isLoading &&
@@ -813,6 +840,7 @@ class _ReaderScreenState extends State<ReaderScreen>
                     }
                   } else if (notification is ScrollUpdateNotification) {
                     if (_controller.isWebtoonMode &&
+                        notification.dragDetails != null &&
                         !_controller.isLoading &&
                         !_controller.isChangingChapter &&
                         !_controller.isRestoringScroll &&
@@ -829,7 +857,7 @@ class _ReaderScreenState extends State<ReaderScreen>
                       }
                       final overscrollAmount = notification.metrics.pixels -
                           notification.metrics.maxScrollExtent;
-                      if (overscrollAmount >= 120) {
+                      if (overscrollAmount >= 150) {
                         _controller.setAccumulatedBottomOverscroll(0);
                         _changeChapter(true);
                       }
