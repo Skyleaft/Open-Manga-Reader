@@ -2,7 +2,7 @@ import 'dart:ffi';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:dio/dio.dart';
-import 'package:open_file_plus/open_file_plus.dart';
+import 'package:open_filex/open_filex.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:path_provider/path_provider.dart';
 
@@ -147,7 +147,7 @@ class UpdateService {
   /// Install APK secara native di Android
   Future<bool> installApk(String filePath) async {
     try {
-      final result = await OpenFile.open(
+      final result = await OpenFilex.open(
         filePath,
         type: 'application/vnd.android.package-archive',
       );

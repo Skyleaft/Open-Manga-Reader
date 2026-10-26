@@ -43,7 +43,7 @@ dependencies:
   signalr_netcore: ^1.4.4
   connectivity_plus: ^7.3.1
   flutter_cache_manager: ^3.4.5
-  open_file_plus: ^3.4.1+1
+  open_filex: ^5.0.0
 dev_dependencies:
   flutter_test:
     sdk: flutter
