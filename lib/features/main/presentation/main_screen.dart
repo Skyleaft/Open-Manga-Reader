@@ -89,7 +89,9 @@ class _MainScreenState extends State<MainScreen> {
   }
 
   Future<void> _checkForUpdate() async {
-    final updateService = UpdateService();
+    final updateService = getIt.isRegistered<UpdateService>()
+        ? getIt<UpdateService>()
+        : UpdateService();
     final updateData = await updateService.checkForUpdate();
 
     if (updateData != null && mounted) {

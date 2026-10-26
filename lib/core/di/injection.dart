@@ -13,6 +13,7 @@ import '../../features/library/services/library_service.dart';
 import '../../features/manga_detail/services/manga_detail_service.dart';
 import '../../features/manga_detail/services/manga_signalr_service.dart';
 import '../../features/settings/services/storage_service.dart';
+import '../../features/settings/services/update_service.dart';
 import '../../features/download/services/download_service.dart';
 
 final getIt = GetIt.instance;
@@ -51,6 +52,7 @@ Future<void> setupInjection() async {
   getIt.registerLazySingleton<LibraryCacheService>(() => LibraryCacheService());
   getIt.registerLazySingleton<StorageService>(() => StorageService());
   getIt.registerLazySingleton<DownloadService>(() => DownloadService());
+  getIt.registerLazySingleton<UpdateService>(() => UpdateService());
 
   final progressionService = ProgressionService();
   getIt.registerSingleton<ProgressionService>(progressionService);

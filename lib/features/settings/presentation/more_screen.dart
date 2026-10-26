@@ -298,7 +298,9 @@ class _MoreScreenState extends State<MoreScreen>
         duration: const Duration(seconds: 2),
       );
 
-      final updateService = getIt<UpdateService>();
+      final updateService = getIt.isRegistered<UpdateService>()
+          ? getIt<UpdateService>()
+          : UpdateService();
       final updateData = await updateService.checkForUpdate();
 
       if (!mounted) return;
