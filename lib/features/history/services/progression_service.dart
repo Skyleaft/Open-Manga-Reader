@@ -28,9 +28,9 @@ class ProgressionService extends ChangeNotifier {
   static const Duration _cacheTtl = Duration(minutes: 5);
 
   DateTime? _lastSyncTime;
-  bool _isSyncingAll = false;
   final Set<String> _syncingMangaIds = {};
   StreamSubscription<Map<String, dynamic>>? _signalRSub;
+  Completer<void>? _syncCompleter;
 
   String get _currentUserId => getIt<MangaApiService>().userId ?? '';
 
@@ -240,16 +240,16 @@ class ProgressionService extends ChangeNotifier {
   Future<List<MangaProgression>> getAllProgressions({
     bool forceSync = false,
   }) async {
-    final local = await _loadFromLocalCache();
-
     final isStale = _lastSyncTime == null ||
         DateTime.now().difference(_lastSyncTime!) > _cacheTtl;
 
-    if (forceSync || (isStale && local.isEmpty)) {
+    if (forceSync) {
+      await _syncAllProgressionsFromApi();
+    } else if (isStale) {
       _syncAllProgressionsFromApi();
     }
 
-    return local;
+    return await _loadFromLocalCache();
   }
 
   Future<void> refreshFromApi() async {
@@ -257,8 +257,12 @@ class ProgressionService extends ChangeNotifier {
   }
 
   Future<void> _syncAllProgressionsFromApi() async {
-    if (_currentUserId.isEmpty || _isSyncingAll) return;
-    _isSyncingAll = true;
+    if (_currentUserId.isEmpty) return;
+    if (_syncCompleter != null) {
+      return _syncCompleter!.future;
+    }
+    final completer = Completer<void>();
+    _syncCompleter = completer;
 
     try {
       final apiService = getIt<MangaApiService>();
@@ -319,7 +323,8 @@ class ProgressionService extends ChangeNotifier {
       syncService.syncPendingActions();
     } catch (_) {
     } finally {
-      _isSyncingAll = false;
+      completer.complete();
+      _syncCompleter = null;
     }
   }
 

@@ -49,7 +49,7 @@ class _HomeScreenState extends State<HomeScreen>
       vsync: this,
     );
     _trendingTabController.addListener(_onTrendingTabChanged);
-    _controller.fetchAllData();
+    _controller.fetchAllData(syncProgressionFirst: true);
   }
 
   @override

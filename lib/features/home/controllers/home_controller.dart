@@ -85,11 +85,22 @@ class HomeController extends ChangeNotifier {
     super.dispose();
   }
 
-  Future<void> fetchAllData() async {
+  Future<void> fetchAllData({bool syncProgressionFirst = true}) async {
+    if (syncProgressionFirst) {
+      // 1. Fetch & sync progression first so continue reading and recommendations reflect latest state from other devices
+      try {
+        await fetchHistory(forceSync: true);
+      } catch (e) {
+        debugPrint('Error syncing/fetching history first: $e');
+      }
+    }
+
+    // 2. Fetch other sections in parallel
     await Future.wait([
-      fetchHistory().catchError(
-        (e) => debugPrint('Error fetching history: $e'),
-      ),
+      if (!syncProgressionFirst)
+        fetchHistory().catchError(
+          (e) => debugPrint('Error fetching history: $e'),
+        ),
       fetchTrendingForTab(
         0,
       ).catchError((e) => debugPrint('Error fetching trending: $e')),
@@ -108,7 +119,7 @@ class HomeController extends ChangeNotifier {
     _isLoadingRecommended = true;
     _isLoadingTop = true;
     _safeNotifyListeners();
-    await fetchAllData();
+    await fetchAllData(syncProgressionFirst: true);
   }
 
   Future<void> fetchTrendingForTab(int tabIdx) async {
@@ -131,12 +142,24 @@ class HomeController extends ChangeNotifier {
     }
   }
 
-  Future<void> fetchHistory() async {
+  Future<void> fetchHistory({bool forceSync = false}) async {
     _isLoadingHistory = true;
     _safeNotifyListeners();
 
     try {
-      final progressions = await _progressionService.getAllProgressions();
+      // Preload local cache first so UI immediately shows cached items while syncing
+      if (forceSync && _recentProgressions.isEmpty) {
+        final initialLocal = await _progressionService.getAllProgressions(forceSync: false);
+        if (initialLocal.isNotEmpty && _recentProgressions.isEmpty) {
+          initialLocal.sort((a, b) => b.lastRead.compareTo(a.lastRead));
+          _recentProgressions = initialLocal.take(10).toList();
+          _safeNotifyListeners();
+        }
+      }
+
+      final progressions = await _progressionService.getAllProgressions(
+        forceSync: forceSync,
+      );
       progressions.sort((a, b) => b.lastRead.compareTo(a.lastRead));
       final recent = progressions.take(10).toList();
 
