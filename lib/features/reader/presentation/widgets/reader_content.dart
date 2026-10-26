@@ -266,6 +266,7 @@ class _ReaderContentWidgetState extends State<ReaderContentWidget> {
                                   Material(
                                     color: Colors.transparent,
                                     child: InkWell(
+                                      canRequestFocus: false,
                                       onTap: widget.isLoading
                                           ? null
                                           : () => widget.onPageChanged(
