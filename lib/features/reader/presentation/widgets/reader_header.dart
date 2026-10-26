@@ -9,6 +9,7 @@ class ReaderHeader extends StatelessWidget {
   final VoidCallback onSettings;
   final VoidCallback? onChapterListTap;
   final VoidCallback? onToggleFullscreen;
+  final VoidCallback? onShowShortcuts;
   final bool isFullscreen;
 
   const ReaderHeader({
@@ -19,6 +20,7 @@ class ReaderHeader extends StatelessWidget {
     required this.onSettings,
     this.onChapterListTap,
     this.onToggleFullscreen,
+    this.onShowShortcuts,
     this.isFullscreen = false,
   });
 
@@ -126,6 +128,14 @@ class ReaderHeader extends StatelessWidget {
                           : Icons.fullscreen_rounded,
                       onToggleFullscreen!,
                       tooltip: 'Toggle Fullscreen (F)',
+                    ),
+                  ],
+                  if (onShowShortcuts != null && !isCompact) ...[
+                    const SizedBox(width: 8),
+                    _buildGlassIconButton(
+                      Icons.keyboard_alt_outlined,
+                      onShowShortcuts!,
+                      tooltip: 'Keyboard Shortcuts (?)',
                     ),
                   ],
                   const SizedBox(width: 8),

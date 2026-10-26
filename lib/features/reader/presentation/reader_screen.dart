@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:ui';
 import 'package:flutter/foundation.dart' show kDebugMode;
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
@@ -14,6 +15,7 @@ import 'widgets/reader_chapter_picker_sheet.dart';
 import 'widgets/reader_content.dart';
 import 'widgets/reader_header.dart';
 import 'widgets/reader_settings_sheet.dart';
+import 'widgets/reader_shortcuts_dialog.dart';
 
 class ReaderScreen extends StatefulWidget {
   final ReaderContent content;
@@ -319,12 +321,15 @@ class _ReaderScreenState extends State<ReaderScreen>
           ? ((activePage - 1) / (_controller.pageUrls.length - 1)).clamp(0.0, 1.0)
           : 1.0;
 
+      // Isolated update: doesn't trigger full ReaderScreen rebuild!
       _controller.updatePageAndProgress(activePage, newProgress);
+      HapticFeedback.selectionClick();
       _controller.debounceSaveProgression();
     }
   }
 
   void _changeChapter(bool next) {
+    HapticFeedback.mediumImpact();
     _controller.changeChapter(
       next: next,
       onChapterNotFound: () {
@@ -382,6 +387,7 @@ class _ReaderScreenState extends State<ReaderScreen>
   }
 
   void _loadChapter(Chapter targetChapter, {int initialPage = 1}) {
+    HapticFeedback.mediumImpact();
     _controller.loadChapter(
       targetChapter,
       initialPage: initialPage,
@@ -414,6 +420,35 @@ class _ReaderScreenState extends State<ReaderScreen>
         if (initialPage > 1 && _controller.isWebtoonMode) {
           _jumpToWebtoonPage(initialPage - 1);
         }
+      },
+      onError: (msg) {
+        if (mounted) {
+          AlertBanner.show(context, msg, type: AlertBannerType.error);
+        }
+      },
+    );
+  }
+
+  void _retryChapter() {
+    _controller.retryCurrentChapter(
+      onBeforeLoad: () {
+        _pageKeys.clear();
+        _transformationController.value = Matrix4.identity();
+        if (_scrollController.hasClients) {
+          _scrollController.jumpTo(0.0);
+        }
+      },
+      onLoaded: () {
+        _pageKeys.clear();
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (!mounted) return;
+          if (_scrollController.hasClients) {
+            _scrollController.jumpTo(0.0);
+          }
+          if (_pageController.hasClients) {
+            _pageController.jumpToPage(_controller.currentPage - 1);
+          }
+        });
       },
       onError: (msg) {
         if (mounted) {
@@ -536,6 +571,11 @@ class _ReaderScreenState extends State<ReaderScreen>
       return;
     }
 
+    if (key == LogicalKeyboardKey.slash || key == LogicalKeyboardKey.keyH) {
+      ReaderShortcutsDialog.show(context);
+      return;
+    }
+
     if (key == LogicalKeyboardKey.escape) {
       if (_controller.isFullscreen) {
         _controller.toggleFullscreen();
@@ -647,6 +687,7 @@ class _ReaderScreenState extends State<ReaderScreen>
     final progress =
         (index / (_controller.pageUrls.length - 1)).clamp(0.0, 1.0);
     _controller.updatePageAndProgress(page, progress);
+    HapticFeedback.selectionClick();
     _controller.debounceSaveProgression();
   }
 
@@ -823,6 +864,117 @@ class _ReaderScreenState extends State<ReaderScreen>
                   onToggleUI: _controller.toggleUI,
                 ),
               ),
+
+              // Dedicated Error State & Retry Overlay (Center of reader)
+              if (_controller.errorMessage != null &&
+                  _controller.pageUrls.isEmpty &&
+                  !_controller.isLoading)
+                Center(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 24),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(24),
+                      child: BackdropFilter(
+                        filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
+                        child: Container(
+                          padding: const EdgeInsets.all(28),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF13151B)
+                                .withValues(alpha: 0.90),
+                            borderRadius: BorderRadius.circular(24),
+                            border: Border.all(
+                              color: Colors.redAccent.withValues(alpha: 0.4),
+                              width: 1.2,
+                            ),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withValues(alpha: 0.5),
+                                blurRadius: 20,
+                              ),
+                            ],
+                          ),
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.all(16),
+                                decoration: BoxDecoration(
+                                  color:
+                                      Colors.redAccent.withValues(alpha: 0.15),
+                                  shape: BoxShape.circle,
+                                ),
+                                child: const Icon(
+                                  Icons.cloud_off_rounded,
+                                  color: Colors.redAccent,
+                                  size: 36,
+                                ),
+                              ),
+                              const SizedBox(height: 16),
+                              const Text(
+                                'Failed to Load Chapter',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+                              Text(
+                                _controller.errorMessage!,
+                                textAlign: TextAlign.center,
+                                maxLines: 3,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  color: Colors.white70,
+                                  fontSize: 12,
+                                ),
+                              ),
+                              const SizedBox(height: 20),
+                              Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  OutlinedButton.icon(
+                                    onPressed: () => Navigator.pop(context),
+                                    icon: const Icon(Icons.arrow_back_rounded,
+                                        size: 16),
+                                    label: const Text('Back'),
+                                    style: OutlinedButton.styleFrom(
+                                      foregroundColor: Colors.white70,
+                                      side: const BorderSide(
+                                        color: Colors.white24,
+                                      ),
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius:
+                                            BorderRadius.circular(12),
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 12),
+                                  ElevatedButton.icon(
+                                    onPressed: _retryChapter,
+                                    icon: const Icon(Icons.refresh_rounded,
+                                        size: 16),
+                                    label: const Text('Retry'),
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: AppColors.primary,
+                                      foregroundColor: Colors.white,
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius:
+                                            BorderRadius.circular(12),
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+
+              // Animated Reader Header
               AnimatedPositioned(
                 duration: const Duration(milliseconds: 300),
                 top: _controller.showUI ? 0 : -150,
@@ -837,89 +989,195 @@ class _ReaderScreenState extends State<ReaderScreen>
                     onSettings: _showSettingsBottomSheet,
                     onChapterListTap: _showChapterPickerSheet,
                     onToggleFullscreen: _controller.toggleFullscreen,
+                    onShowShortcuts: () => ReaderShortcutsDialog.show(context),
                   ),
                 ),
               ),
-              // Floating Auto-Scroll HUD
+
+              // Glassmorphic Floating Auto-Scroll HUD
               if (_controller.isAutoScrolling)
                 Positioned(
                   top: 80,
                   right: 20,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 6,
-                    ),
-                    decoration: BoxDecoration(
-                      color: Colors.black.withValues(alpha: 0.75),
-                      borderRadius: BorderRadius.circular(20),
-                      border: Border.all(
-                        color: AppColors.primary.withValues(alpha: 0.5),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(24),
+                    child: BackdropFilter(
+                      filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 14,
+                          vertical: 7,
+                        ),
+                        decoration: BoxDecoration(
+                          color: Colors.black.withValues(alpha: 0.70),
+                          borderRadius: BorderRadius.circular(24),
+                          border: Border.all(
+                            color: AppColors.primary.withValues(alpha: 0.5),
+                            width: 1.2,
+                          ),
+                          boxShadow: [
+                            BoxShadow(
+                              color: AppColors.primary.withValues(alpha: 0.25),
+                              blurRadius: 10,
+                            ),
+                          ],
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              Icons.play_circle_fill_rounded,
+                              color: AppColors.primary,
+                              size: 16,
+                            ),
+                            const SizedBox(width: 6),
+                            Text(
+                              'Auto-scroll ${_controller.autoScrollSpeed}x',
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 12,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            GestureDetector(
+                              onTap: _toggleAutoScroll,
+                              child: const Icon(
+                                Icons.pause_circle_outline_rounded,
+                                color: Colors.white70,
+                                size: 18,
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(
-                          Icons.play_circle_fill_rounded,
-                          color: AppColors.primary,
-                          size: 16,
-                        ),
-                        const SizedBox(width: 6),
-                        Text(
-                          'Auto-scroll ${_controller.autoScrollSpeed}x',
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 12,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        GestureDetector(
-                          onTap: _toggleAutoScroll,
-                          child: const Icon(
-                            Icons.pause_circle_outline_rounded,
-                            color: Colors.white70,
-                            size: 18,
-                          ),
-                        ),
-                      ],
                     ),
                   ),
                 ),
-              // Floating Debug Info HUD (Debug Mode Only)
+
+              // Glassmorphic Floating Debug Info HUD (Debug Mode Only)
               if (kDebugMode)
                 AnimatedPositioned(
                   duration: const Duration(milliseconds: 300),
                   top: _controller.showUI ? 70 : 20,
                   left: 20,
                   child: IgnorePointer(
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 10,
-                        vertical: 5,
-                      ),
-                      decoration: BoxDecoration(
-                        color: Colors.black.withValues(alpha: 0.8),
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(
-                          color: AppColors.primary.withValues(alpha: 0.6),
-                          width: 1,
-                        ),
-                      ),
-                      child: Text(
-                        'Debug: Page ${_controller.currentPage} / ${_controller.pageUrls.length} • '
-                        '${_controller.isWebtoonMode ? 'Scroll: ${_scrollController.hasClients ? _scrollController.offset.toInt() : 0}px' : 'Paged Mode'}',
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 11,
-                          fontFamily: 'monospace',
-                          fontWeight: FontWeight.bold,
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(8),
+                      child: BackdropFilter(
+                        filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 10,
+                            vertical: 5,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Colors.black.withValues(alpha: 0.75),
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(
+                              color: AppColors.primary.withValues(alpha: 0.5),
+                              width: 1,
+                            ),
+                          ),
+                          child: ValueListenableBuilder<int>(
+                            valueListenable: _controller.currentPageNotifier,
+                            builder: (context, curPage, _) {
+                              return Text(
+                                'Debug: Page $curPage / ${_controller.pageUrls.length} • '
+                                '${_controller.isWebtoonMode ? 'Scroll: ${_scrollController.hasClients ? _scrollController.offset.toInt() : 0}px' : 'Paged Mode'}',
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 11,
+                                  fontFamily: 'monospace',
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              );
+                            },
+                          ),
                         ),
                       ),
                     ),
                   ),
                 ),
+
+              // Pull-to-Next Chapter Interactive Overscroll Pill (Webtoon Mode)
+              ValueListenableBuilder<double>(
+                valueListenable: _controller.accumulatedBottomOverscrollNotifier,
+                builder: (context, overscroll, _) {
+                  final isVisible = overscroll > 10;
+                  final isTriggered = overscroll >= 150;
+                  return AnimatedPositioned(
+                    duration: const Duration(milliseconds: 200),
+                    curve: Curves.easeOutCubic,
+                    bottom: isVisible ? 78 : -80,
+                    left: 0,
+                    right: 0,
+                    child: Center(
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(24),
+                        child: BackdropFilter(
+                          filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
+                          child: AnimatedContainer(
+                            duration: const Duration(milliseconds: 200),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 16,
+                              vertical: 8,
+                            ),
+                            decoration: BoxDecoration(
+                              color: Colors.black.withValues(alpha: 0.85),
+                              borderRadius: BorderRadius.circular(24),
+                              border: Border.all(
+                                color: isTriggered
+                                    ? const Color(0xFF10B981)
+                                    : AppColors.primary.withValues(alpha: 0.6),
+                                width: 1.5,
+                              ),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: (isTriggered
+                                          ? const Color(0xFF10B981)
+                                          : AppColors.primary)
+                                      .withValues(alpha: 0.35),
+                                  blurRadius: 12,
+                                ),
+                              ],
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  isTriggered
+                                      ? Icons.check_circle_rounded
+                                      : Icons.keyboard_arrow_down_rounded,
+                                  color: isTriggered
+                                      ? const Color(0xFF10B981)
+                                      : AppColors.primary,
+                                  size: 18,
+                                ),
+                                const SizedBox(width: 8),
+                                Text(
+                                  isTriggered
+                                      ? 'Release for Next Chapter'
+                                      : 'Pull for Next Chapter (${(overscroll / 150 * 100).clamp(0, 100).toInt()}%)',
+                                  style: TextStyle(
+                                    color: isTriggered
+                                        ? const Color(0xFF10B981)
+                                        : Colors.white,
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  );
+                },
+              ),
+
+              // Animated Reader Bottom Bar (Isolated via ListenableBuilder)
               AnimatedPositioned(
                 duration: const Duration(milliseconds: 300),
                 bottom: _controller.showUI ? 20 : -350,
@@ -931,76 +1189,90 @@ class _ReaderScreenState extends State<ReaderScreen>
                     child: Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 20),
                       child: RepaintBoundary(
-                        child: ReaderBottomBar(
-                          progress: _controller.progress,
-                          currentPage: _controller.currentPage,
-                          totalPages: _controller.pageUrls.length,
-                          isSliderScrolling: _controller.isSliderScrolling,
-                          isRtlMode: _controller.isRtlMode,
-                          onProgressChanged: (value) {
-                            final targetPage =
-                                ((value * (_controller.pageUrls.length - 1))
-                                            .round() +
-                                        1)
-                                    .clamp(1, _controller.pageUrls.length);
+                        child: AnimatedBuilder(
+                          animation: Listenable.merge([
+                            _controller.currentPageNotifier,
+                            _controller.progressNotifier,
+                          ]),
+                          builder: (context, _) {
+                            return ReaderBottomBar(
+                              progress: _controller.progress,
+                              currentPage: _controller.currentPage,
+                              totalPages: _controller.pageUrls.length,
+                              isSliderScrolling: _controller.isSliderScrolling,
+                              isRtlMode: _controller.isRtlMode,
+                              onProgressChanged: (value) {
+                                final targetPage =
+                                    ((value * (_controller.pageUrls.length - 1))
+                                                .round() +
+                                            1)
+                                        .clamp(1, _controller.pageUrls.length);
 
-                            _controller.updatePageAndProgress(
-                              targetPage,
-                              value,
+                                _controller.updatePageAndProgress(
+                                  targetPage,
+                                  value,
+                                );
+
+                                if (_controller.isWebtoonMode &&
+                                    _scrollController.hasClients) {
+                                  _controller.setRestoringScroll(false);
+                                  final targetIndex = targetPage - 1;
+                                  final screenWidth = MediaQuery.of(
+                                    context,
+                                  ).size.width;
+                                  final contentWidth = (screenWidth < 800.0
+                                      ? screenWidth
+                                      : 800.0);
+                                  final maxScroll = _scrollController
+                                      .position.maxScrollExtent;
+                                  final estimatedOffset =
+                                      _controller.calculateEstimatedOffset(
+                                    targetIndex,
+                                    contentWidth,
+                                    maxScrollExtent: maxScroll,
+                                    hasClients: _scrollController.hasClients,
+                                  );
+
+                                  _scrollController.jumpTo(
+                                    estimatedOffset.clamp(
+                                      0.0,
+                                      maxScroll > 0
+                                          ? maxScroll
+                                          : estimatedOffset,
+                                    ),
+                                  );
+                                }
+
+                                if (!_controller.isWebtoonMode &&
+                                    _pageController.hasClients) {
+                                  _pageController.jumpToPage(
+                                    _controller.currentPage - 1,
+                                  );
+                                }
+                              },
+                              onProgressChangeStart: (_) {
+                                _controller.setSliderScrolling(true);
+                              },
+                              onProgressChangeEnd: (_) {
+                                _controller.setSliderScrolling(false);
+                                if (_controller.isWebtoonMode) {
+                                  _jumpToWebtoonPage(
+                                    _controller.currentPage - 1,
+                                  );
+                                }
+                              },
+                              onNextChapter: () => _changeChapter(true),
+                              onPreviousChapter: () => _changeChapter(false),
                             );
-
-                            if (_controller.isWebtoonMode &&
-                                _scrollController.hasClients) {
-                              _controller.setRestoringScroll(false);
-                              final targetIndex = targetPage - 1;
-                              final screenWidth = MediaQuery.of(
-                                context,
-                              ).size.width;
-                              final contentWidth = (screenWidth < 800.0
-                                  ? screenWidth
-                                  : 800.0);
-                              final maxScroll = _scrollController
-                                  .position.maxScrollExtent;
-                              final estimatedOffset =
-                                  _controller.calculateEstimatedOffset(
-                                targetIndex,
-                                contentWidth,
-                                maxScrollExtent: maxScroll,
-                                hasClients: _scrollController.hasClients,
-                              );
-
-                              _scrollController.jumpTo(
-                                estimatedOffset.clamp(
-                                  0.0,
-                                  maxScroll > 0 ? maxScroll : estimatedOffset,
-                                ),
-                              );
-                            }
-
-                            if (!_controller.isWebtoonMode &&
-                                _pageController.hasClients) {
-                              _pageController.jumpToPage(
-                                _controller.currentPage - 1,
-                              );
-                            }
                           },
-                          onProgressChangeStart: (_) {
-                            _controller.setSliderScrolling(true);
-                          },
-                          onProgressChangeEnd: (_) {
-                            _controller.setSliderScrolling(false);
-                            if (_controller.isWebtoonMode) {
-                              _jumpToWebtoonPage(_controller.currentPage - 1);
-                            }
-                          },
-                          onNextChapter: () => _changeChapter(true),
-                          onPreviousChapter: () => _changeChapter(false),
                         ),
                       ),
                     ),
                   ),
                 ),
               ),
+
+              // Mini Progress Bar (Isolated via ValueListenableBuilder)
               Positioned(
                 left: 0,
                 right: 0,
@@ -1016,33 +1288,37 @@ class _ReaderScreenState extends State<ReaderScreen>
                                 _controller.hideMiniProgressBar
                             ? 0
                             : 1,
-                        child: _controller.pageUrls.isEmpty
-                            ? const SizedBox.shrink()
-                            : Row(
-                                children: List.generate(
-                                  _controller.pageUrls.length,
-                                  (index) {
-                                    final pageNumber = index + 1;
-                                    final isRead =
-                                        pageNumber <= _controller.currentPage;
-                                    return Expanded(
-                                      child: Container(
-                                        height: 6,
-                                        margin: const EdgeInsets.symmetric(
-                                          horizontal: 1,
-                                        ),
-                                        decoration: BoxDecoration(
-                                          color: isRead
-                                              ? AppColors.primary
-                                              : Colors.white10,
-                                          borderRadius:
-                                              BorderRadius.circular(3),
-                                        ),
+                        child: ValueListenableBuilder<int>(
+                          valueListenable: _controller.currentPageNotifier,
+                          builder: (context, curPage, _) {
+                            if (_controller.pageUrls.isEmpty) {
+                              return const SizedBox.shrink();
+                            }
+                            return Row(
+                              children: List.generate(
+                                _controller.pageUrls.length,
+                                (index) {
+                                  final pageNumber = index + 1;
+                                  final isRead = pageNumber <= curPage;
+                                  return Expanded(
+                                    child: Container(
+                                      height: 6,
+                                      margin: const EdgeInsets.symmetric(
+                                        horizontal: 1,
                                       ),
-                                    );
-                                  },
-                                ),
+                                      decoration: BoxDecoration(
+                                        color: isRead
+                                            ? AppColors.primary
+                                            : Colors.white10,
+                                        borderRadius: BorderRadius.circular(3),
+                                      ),
+                                    ),
+                                  );
+                                },
                               ),
+                            );
+                          },
+                        ),
                       ),
                     ),
                   ),

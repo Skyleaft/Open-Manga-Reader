@@ -1,5 +1,4 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:my_manga_reader/core/di/injection.dart';
 import 'package:my_manga_reader/core/models/chapter_page.dart';
 import 'package:my_manga_reader/features/manga_detail/models/manga_detail.dart';
 import 'package:my_manga_reader/features/reader/controllers/reader_controller.dart';
@@ -7,10 +6,6 @@ import 'package:my_manga_reader/features/reader/models/reader_content.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
-
-  setUpAll(() async {
-    // Ensure getIt doesn't throw if not configured, or setup mocks if needed
-  });
 
   group('ReaderController Tests', () {
     final sampleChapters = [
@@ -110,15 +105,59 @@ void main() {
       controller.dispose();
     });
 
-    test('updatePageAndProgress updates values and notifies listeners', () {
+    test('updatePageAndProgress updates ValueNotifiers with isolated re-render', () {
       final controller = ReaderController(content: sampleContent);
-      bool notified = false;
-      controller.addListener(() => notified = true);
+      bool pageNotified = false;
+      bool progressNotified = false;
+      bool controllerNotified = false;
 
+      controller.currentPageNotifier.addListener(() => pageNotified = true);
+      controller.progressNotifier.addListener(() => progressNotified = true);
+      controller.addListener(() => controllerNotified = true);
+
+      // Default: does not notify global controller to prevent full-tree rebuild
       controller.updatePageAndProgress(3, 1.0);
       expect(controller.currentPage, 3);
       expect(controller.progress, 1.0);
-      expect(notified, isTrue);
+      expect(pageNotified, isTrue);
+      expect(progressNotified, isTrue);
+      expect(controllerNotified, isFalse);
+
+      // With notifyController: true
+      controller.updatePageAndProgress(1, 0.0, notifyController: true);
+      expect(controller.currentPage, 1);
+      expect(controller.progress, 0.0);
+      expect(controllerNotified, isTrue);
+
+      controller.dispose();
+    });
+
+    test('overscroll notifier updates without notifying full controller', () {
+      final controller = ReaderController(content: sampleContent);
+      bool overscrollNotified = false;
+      bool controllerNotified = false;
+
+      controller.accumulatedBottomOverscrollNotifier
+          .addListener(() => overscrollNotified = true);
+      controller.addListener(() => controllerNotified = true);
+
+      controller.addAccumulatedBottomOverscroll(50.0);
+      expect(controller.accumulatedBottomOverscroll, 50.0);
+      expect(overscrollNotified, isTrue);
+      expect(controllerNotified, isFalse);
+
+      controller.setAccumulatedBottomOverscroll(0.0);
+      expect(controller.accumulatedBottomOverscroll, 0.0);
+
+      controller.dispose();
+    });
+
+    test('clearError clears error message and notifies listeners', () {
+      final controller = ReaderController(content: sampleContent);
+      expect(controller.errorMessage, isNull);
+
+      controller.clearError();
+      expect(controller.errorMessage, isNull);
 
       controller.dispose();
     });
