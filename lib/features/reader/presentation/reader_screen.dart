@@ -324,7 +324,6 @@ class _ReaderScreenState extends State<ReaderScreen>
 
       // Isolated update: doesn't trigger full ReaderScreen rebuild!
       _controller.updatePageAndProgress(activePage, newProgress);
-      HapticFeedback.selectionClick();
       _controller.debounceSaveProgression();
     }
   }
@@ -710,7 +709,6 @@ class _ReaderScreenState extends State<ReaderScreen>
     final progress =
         (index / (_controller.pageUrls.length - 1)).clamp(0.0, 1.0);
     _controller.updatePageAndProgress(page, progress);
-    HapticFeedback.selectionClick();
     _controller.debounceSaveProgression();
   }
 
