@@ -3,6 +3,7 @@ import 'package:dio/dio.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/widgets.dart';
+import 'package:uuid/uuid.dart';
 import '../config/app_config.dart';
 import '../models/manga_summary.dart';
 import '../models/paged_response.dart';
@@ -18,12 +19,14 @@ class MangaApiService {
   static const String _userIdKey = 'auth_user_id';
   static const String _usernameKey = 'auth_username';
   static const String _expiryKey = 'auth_expiry';
+  static const String _deviceIdKey = 'app_device_id';
 
   final Dio _dio;
   String? _jwtToken;
   String? _userId;
   String? _username;
   String? _expiry;
+  String? _deviceId;
 
   List<String>? _cachedGenres;
   List<String>? _cachedTypes;
@@ -33,6 +36,7 @@ class MangaApiService {
   String? get username => _username;
   String? get expiry => _expiry;
   String? get jwtToken => _jwtToken;
+  String? get deviceId => _deviceId;
 
   MangaApiService()
     : _dio = Dio(
@@ -52,6 +56,11 @@ class MangaApiService {
     _userId = prefs.getString(_userIdKey);
     _username = prefs.getString(_usernameKey);
     _expiry = prefs.getString(_expiryKey);
+    _deviceId = prefs.getString(_deviceIdKey);
+    if (_deviceId == null || _deviceId!.isEmpty) {
+      _deviceId = const Uuid().v4();
+      await prefs.setString(_deviceIdKey, _deviceId!);
+    }
   }
 
   dynamic _unwrap(dynamic responseData) {
@@ -291,6 +300,7 @@ class MangaApiService {
   Future<PagedResponse<MangaSummary>> queryPagedManga(
     QueryPagedMangaRequest request, {
     CancelToken? cancelToken,
+  }) async { /*
   }) async {
     try {
       final response = await _dio.request(
@@ -345,6 +355,7 @@ class MangaApiService {
     String query, {
     int limit = 10,
     CancelToken? cancelToken,
+  }) async { /*
   }) async {
     try {
       final response = await _dio.get(
@@ -422,6 +433,7 @@ class MangaApiService {
     String? excludeMangaId,
     int limit = 20,
     CancelToken? cancelToken,
+  }) async { /*
   }) async {
     try {
       final response = await _dio.get(
@@ -457,6 +469,7 @@ class MangaApiService {
     List<String>? genres,
     int limit = 20,
     CancelToken? cancelToken,
+  }) async { /*
   }) async {
     try {
       final response = await _dio.get(
@@ -529,6 +542,7 @@ class MangaApiService {
   Future<Map<String, dynamic>> getMangaDetail(
     String mangaId, {
     CancelToken? cancelToken,
+  }) async { /*
   }) async {
     try {
       final response = await _dio.get(
@@ -545,6 +559,7 @@ class MangaApiService {
   Future<List<Map<String, dynamic>>> getMangaChapters(
     String mangaId, {
     CancelToken? cancelToken,
+  }) async { /*
   }) async {
     try {
       final response = await _dio.get(
@@ -595,6 +610,7 @@ class MangaApiService {
     String mangaId,
     dynamic chapterId, {
     CancelToken? cancelToken,
+  }) async { /*
   }) async {
     try {
       final response = await _dio.get(
@@ -877,14 +893,28 @@ class MangaApiService {
   }
 
   Future<Map<String, dynamic>> updateUserProgression(
-    Map<String, dynamic> data,
-  ) async {
+    Map<String, dynamic> data, {
+    CancelToken? cancelToken,
+  }) async { /*
+  }) async {
+    Map<String, dynamic> data, {
+    CancelToken? cancelToken,
+  }) async {
     try {
       if ((data['userId'] == null || (data['userId'] as String).isEmpty) &&
           _userId != null) {
         data['userId'] = _userId;
       }
-      final response = await _dio.post('/api/v1/user-progression', data: data);
+      if ((data['senderDeviceId'] == null ||
+              (data['senderDeviceId'] as String).isEmpty) &&
+          _deviceId != null) {
+        data['senderDeviceId'] = _deviceId;
+      }
+      final response = await _dio.post(
+        '/api/v1/user-progression',
+        data: data,
+        cancelToken: cancelToken,
+      );
       final unwrapped = _unwrap(response.data);
       return unwrapped is Map<String, dynamic> ? unwrapped : {};
     } catch (e) {

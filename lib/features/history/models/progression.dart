@@ -210,8 +210,11 @@ class MangaProgression {
     };
   }
 
-  Map<String, dynamic> toApiRequest([String activeUserId = '']) {
-    return {
+  Map<String, dynamic> toApiRequest([
+    String activeUserId = '',
+    String? senderDeviceId,
+  ]) {
+    final map = <String, dynamic>{
       'userId': userId.isNotEmpty ? userId : activeUserId,
       'mangaId': mangaId,
       'chapterId': chapterId,
@@ -222,6 +225,10 @@ class MangaProgression {
       'readingTimeSeconds': readingTimeSeconds,
       'lastReadAt': lastReadAt.toUtc().toIso8601String(),
     };
+    if (senderDeviceId != null && senderDeviceId.isNotEmpty) {
+      map['senderDeviceId'] = senderDeviceId;
+    }
+    return map;
   }
 
   String toJson() => jsonEncode(toMap());

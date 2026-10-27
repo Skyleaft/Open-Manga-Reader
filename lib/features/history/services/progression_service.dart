@@ -59,6 +59,16 @@ class ProgressionService extends ChangeNotifier {
 
   Future<void> _onRemoteProgressionReceived(Map<String, dynamic> data) async {
     try {
+      final senderDeviceId = data['senderDeviceId']?.toString() ?? data['SenderDeviceId']?.toString();
+      final currentDeviceId = getIt<MangaApiService>().deviceId;
+      if (senderDeviceId != null &&
+          currentDeviceId != null &&
+          senderDeviceId.isNotEmpty &&
+          senderDeviceId == currentDeviceId) {
+        // Progression update originated from this device, ignore echo to prevent duplicate cache update
+        return;
+      }
+
       final targetUserId = data['userId']?.toString() ?? '';
       if (_currentUserId.isNotEmpty && targetUserId.isNotEmpty && targetUserId != _currentUserId) {
         return;
@@ -152,7 +162,7 @@ class ProgressionService extends ChangeNotifier {
 
     // 2. Try API
     final apiService = getIt<MangaApiService>();
-    final payload = progression.toApiRequest(_currentUserId);
+    final payload = progression.toApiRequest(_currentUserId, apiService.deviceId);
     try {
       final response = await apiService.updateUserProgression(payload);
       if (response.isNotEmpty) {
@@ -161,7 +171,7 @@ class ProgressionService extends ChangeNotifier {
           updatedProgression.copyWith(
             manga: progression.manga ?? updatedProgression.manga,
           ),
-          overwrite: true,
+          overwrite: false,
           notify: false,
         );
       }
