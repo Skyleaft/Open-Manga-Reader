@@ -895,10 +895,6 @@ class MangaApiService {
   Future<Map<String, dynamic>> updateUserProgression(
     Map<String, dynamic> data, {
     CancelToken? cancelToken,
-  }) async { /*
-  }) async {
-    Map<String, dynamic> data, {
-    CancelToken? cancelToken,
   }) async {
     try {
       if ((data['userId'] == null || (data['userId'] as String).isEmpty) &&
