@@ -300,7 +300,6 @@ class MangaApiService {
   Future<PagedResponse<MangaSummary>> queryPagedManga(
     QueryPagedMangaRequest request, {
     CancelToken? cancelToken,
-  }) async { /*
   }) async {
     try {
       final response = await _dio.request(
@@ -355,7 +354,6 @@ class MangaApiService {
     String query, {
     int limit = 10,
     CancelToken? cancelToken,
-  }) async { /*
   }) async {
     try {
       final response = await _dio.get(
@@ -433,7 +431,6 @@ class MangaApiService {
     String? excludeMangaId,
     int limit = 20,
     CancelToken? cancelToken,
-  }) async { /*
   }) async {
     try {
       final response = await _dio.get(
@@ -469,7 +466,6 @@ class MangaApiService {
     List<String>? genres,
     int limit = 20,
     CancelToken? cancelToken,
-  }) async { /*
   }) async {
     try {
       final response = await _dio.get(
@@ -542,7 +538,6 @@ class MangaApiService {
   Future<Map<String, dynamic>> getMangaDetail(
     String mangaId, {
     CancelToken? cancelToken,
-  }) async { /*
   }) async {
     try {
       final response = await _dio.get(
@@ -559,7 +554,6 @@ class MangaApiService {
   Future<List<Map<String, dynamic>>> getMangaChapters(
     String mangaId, {
     CancelToken? cancelToken,
-  }) async { /*
   }) async {
     try {
       final response = await _dio.get(
@@ -610,7 +604,6 @@ class MangaApiService {
     String mangaId,
     dynamic chapterId, {
     CancelToken? cancelToken,
-  }) async { /*
   }) async {
     try {
       final response = await _dio.get(
