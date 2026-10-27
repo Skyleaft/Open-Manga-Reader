@@ -153,7 +153,9 @@ class _ReaderContentWidgetState extends State<ReaderContentWidget> {
                                   .getMaxScaleOnAxis() >
                               1
                           ? const NeverScrollableScrollPhysics()
-                          : const BouncingScrollPhysics(),
+                          : const BouncingScrollPhysics(
+                              parent: AlwaysScrollableScrollPhysics(),
+                            ),
                   slivers: [
                     SliverVariedExtentList(
                       itemExtentBuilder: (index, dimensions) {
@@ -221,10 +223,7 @@ class _ReaderContentWidgetState extends State<ReaderContentWidget> {
                     ),
                     SliverToBoxAdapter(
                       child: Padding(
-                        padding: const EdgeInsets.symmetric(
-                          vertical: 36,
-                          horizontal: 24,
-                        ),
+                        padding: const EdgeInsets.fromLTRB(24, 20, 24, 12),
                         child: Center(
                           child: ConstrainedBox(
                             constraints: const BoxConstraints(maxWidth: 400),
@@ -261,7 +260,7 @@ class _ReaderContentWidgetState extends State<ReaderContentWidget> {
                                     ],
                                   ),
                                 ),
-                                const SizedBox(height: 20),
+                                const SizedBox(height: 16),
                                 if (widget.hasNextChapter) ...[
                                   Material(
                                     color: Colors.transparent,
@@ -313,13 +312,24 @@ class _ReaderContentWidgetState extends State<ReaderContentWidget> {
                                       ),
                                     ),
                                   ),
-                                  const SizedBox(height: 12),
-                                  const Text(
-                                    'Pull up or tap to continue',
-                                    style: TextStyle(
-                                      color: Colors.white38,
-                                      fontSize: 12,
-                                    ),
+                                  const SizedBox(height: 10),
+                                  Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Icon(
+                                        Icons.keyboard_arrow_up_rounded,
+                                        color: Colors.white38,
+                                        size: 16,
+                                      ),
+                                      const SizedBox(width: 4),
+                                      const Text(
+                                        'Pull up or tap to continue',
+                                        style: TextStyle(
+                                          color: Colors.white38,
+                                          fontSize: 12,
+                                        ),
+                                      ),
+                                    ],
                                   ),
                                 ] else ...[
                                   const SizedBox(height: 8),
@@ -340,8 +350,8 @@ class _ReaderContentWidgetState extends State<ReaderContentWidget> {
                     SliverToBoxAdapter(
                       child: SizedBox(
                         height: math.max(
-                          160.0,
-                          MediaQuery.sizeOf(context).height * 0.45,
+                          24.0,
+                          MediaQuery.paddingOf(context).bottom + 16.0,
                         ),
                       ),
                     ),

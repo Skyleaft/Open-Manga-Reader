@@ -42,6 +42,8 @@ class _ReaderScreenState extends State<ReaderScreen>
   final Map<int, GlobalKey> _pageKeys = {};
   TapDownDetails? _doubleTapDetails;
   double? _targetScrollOffset;
+  bool _isPullToNextArmed = false;
+  Timer? _overscrollResetTimer;
 
   @override
   void initState() {
@@ -78,6 +80,7 @@ class _ReaderScreenState extends State<ReaderScreen>
 
   @override
   void dispose() {
+    _overscrollResetTimer?.cancel();
     _autoScrollTicker.dispose();
     _scrollController.removeListener(_onScroll);
     _scrollController.dispose();
@@ -326,6 +329,15 @@ class _ReaderScreenState extends State<ReaderScreen>
       _controller.updatePageAndProgress(activePage, newProgress);
       _controller.debounceSaveProgression();
     }
+  }
+
+  void _triggerPullToNextChapter() {
+    if (_controller.isLoading || _controller.isChangingChapter) return;
+    _isPullToNextArmed = false;
+    _overscrollResetTimer?.cancel();
+    _controller.setAccumulatedBottomOverscroll(0.0);
+    HapticFeedback.mediumImpact();
+    _changeChapter(true);
   }
 
   void _changeChapter(bool next) {
@@ -814,9 +826,8 @@ class _ReaderScreenState extends State<ReaderScreen>
                   } else if (notification is OverscrollNotification) {
                     if (_controller.isWebtoonMode &&
                         notification.overscroll > 0 &&
-                        notification.dragDetails != null &&
                         notification.metrics.pixels >=
-                            notification.metrics.maxScrollExtent &&
+                            notification.metrics.maxScrollExtent - 5 &&
                         !_controller.isLoading &&
                         !_controller.isChangingChapter &&
                         !_controller.isRestoringScroll &&
@@ -829,65 +840,128 @@ class _ReaderScreenState extends State<ReaderScreen>
                           1.0,
                         );
                       }
-                      _controller
-                          .addAccumulatedBottomOverscroll(notification.overscroll);
-                      if (_controller.accumulatedBottomOverscroll >= 150) {
-                        _controller.setAccumulatedBottomOverscroll(0);
-                        _changeChapter(true);
+                      _controller.addAccumulatedBottomOverscroll(
+                        notification.overscroll,
+                      );
+
+                      if (_controller.accumulatedBottomOverscroll >= 90.0) {
+                        if (!_isPullToNextArmed) {
+                          _isPullToNextArmed = true;
+                          HapticFeedback.lightImpact();
+                        }
                       }
+
+                      _overscrollResetTimer?.cancel();
+                      _overscrollResetTimer = Timer(
+                        const Duration(milliseconds: 400),
+                        () {
+                          if (!mounted ||
+                              _controller.isLoading ||
+                              _controller.isChangingChapter) {
+                            return;
+                          }
+                          if (_isPullToNextArmed) {
+                            _triggerPullToNextChapter();
+                          } else {
+                            _controller.setAccumulatedBottomOverscroll(0);
+                            _isPullToNextArmed = false;
+                          }
+                        },
+                      );
                     }
                   } else if (notification is ScrollUpdateNotification) {
                     if (_controller.isWebtoonMode &&
-                        notification.dragDetails != null &&
                         !_controller.isLoading &&
                         !_controller.isChangingChapter &&
                         !_controller.isRestoringScroll &&
                         !_controller.isJumpingToPage &&
-                        !_controller.isSliderScrolling &&
-                        notification.metrics.pixels >
-                            notification.metrics.maxScrollExtent) {
-                      if (_controller.currentPage !=
-                          _controller.pageUrls.length) {
-                        _controller.updatePageAndProgress(
-                          _controller.pageUrls.length,
-                          1.0,
+                        !_controller.isSliderScrolling) {
+                      if (notification.metrics.pixels >
+                          notification.metrics.maxScrollExtent) {
+                        if (_controller.currentPage !=
+                            _controller.pageUrls.length) {
+                          _controller.updatePageAndProgress(
+                            _controller.pageUrls.length,
+                            1.0,
+                          );
+                        }
+
+                        // Check if user has released drag while ballistic physics is running
+                        if (notification.dragDetails == null &&
+                            _isPullToNextArmed) {
+                          _triggerPullToNextChapter();
+                          return false;
+                        }
+
+                        final overscrollAmount =
+                            notification.metrics.pixels -
+                                notification.metrics.maxScrollExtent;
+                        _controller.setAccumulatedBottomOverscroll(
+                          overscrollAmount,
                         );
-                      }
-                      final overscrollAmount = notification.metrics.pixels -
-                          notification.metrics.maxScrollExtent;
-                      if (overscrollAmount >= 150) {
+
+                        if (overscrollAmount >= 90.0) {
+                          if (!_isPullToNextArmed) {
+                            _isPullToNextArmed = true;
+                            HapticFeedback.lightImpact();
+                          }
+                        } else {
+                          _isPullToNextArmed = false;
+                        }
+                      } else if (notification.metrics.pixels <
+                              notification.metrics.maxScrollExtent - 20 &&
+                          _controller.accumulatedBottomOverscroll > 0) {
                         _controller.setAccumulatedBottomOverscroll(0);
-                        _changeChapter(true);
+                        _isPullToNextArmed = false;
                       }
                     }
                   } else if (notification is ScrollEndNotification) {
-                    _controller.setAccumulatedBottomOverscroll(0);
+                    if (_isPullToNextArmed &&
+                        !_controller.isLoading &&
+                        !_controller.isChangingChapter) {
+                      _triggerPullToNextChapter();
+                    } else {
+                      _controller.setAccumulatedBottomOverscroll(0);
+                      _isPullToNextArmed = false;
+                    }
                   }
                   return false;
                 },
-                child: ReaderContentWidget(
-                  chapterId: _controller.chapterId,
-                  pageUrls: _controller.pageUrls,
-                  httpHeaders: _controller.content.httpHeaders,
-                  isLoading: _controller.isLoading,
-                  showUI: _controller.showUI,
-                  transformationController: _transformationController,
-                  scrollController: _scrollController,
-                  pageController: _pageController,
-                  isWebtoonMode: _controller.isWebtoonMode,
-                  isRtlMode: _controller.isRtlMode,
-                  pageAspectRatios: _controller.pageAspectRatios,
-                  defaultAspectRatio: _controller.calculateAverageRatio(),
-                  getPageKey: _getPageKey,
-                  hasNextChapter: hasNextChapter,
-                  onAspectRatioResolved: (index, ratio) {
-                    _controller.setPageAspectRatio(index, ratio);
+                child: Listener(
+                  onPointerUp: (_) {
+                    if (_isPullToNextArmed) {
+                      _triggerPullToNextChapter();
+                    }
                   },
-                  onPageChanged: _onPageChanged,
-                  onTap: _controller.toggleUI,
-                  onDoubleTapDown: _handleDoubleTapDown,
-                  onDoubleTap: _handleDoubleTap,
-                  onToggleUI: _controller.toggleUI,
+                  onPointerCancel: (_) {
+                    if (_isPullToNextArmed) {
+                      _triggerPullToNextChapter();
+                    }
+                  },
+                  child: ReaderContentWidget(
+                    chapterId: _controller.chapterId,
+                    pageUrls: _controller.pageUrls,
+                    httpHeaders: _controller.content.httpHeaders,
+                    isLoading: _controller.isLoading,
+                    showUI: _controller.showUI,
+                    transformationController: _transformationController,
+                    scrollController: _scrollController,
+                    pageController: _pageController,
+                    isWebtoonMode: _controller.isWebtoonMode,
+                    isRtlMode: _controller.isRtlMode,
+                    pageAspectRatios: _controller.pageAspectRatios,
+                    defaultAspectRatio: _controller.calculateAverageRatio(),
+                    getPageKey: _getPageKey,
+                    hasNextChapter: hasNextChapter,
+                    onAspectRatioResolved: (index, ratio) {
+                      _controller.setPageAspectRatio(index, ratio);
+                    },
+                    onPageChanged: _onPageChanged,
+                    onTap: _controller.toggleUI,
+                    onDoubleTapDown: _handleDoubleTapDown,
+                    onDoubleTap: _handleDoubleTap,
+                    onToggleUI: _controller.toggleUI,
+                  ),
                 ),
               ),
 
@@ -1130,70 +1204,132 @@ class _ReaderScreenState extends State<ReaderScreen>
               ValueListenableBuilder<double>(
                 valueListenable: _controller.accumulatedBottomOverscrollNotifier,
                 builder: (context, overscroll, _) {
-                  final isVisible = overscroll > 10;
-                  final isTriggered = overscroll >= 150;
+                  final isVisible = overscroll > 5;
+                  const double threshold = 90.0;
+                  final double progress =
+                      (overscroll / threshold).clamp(0.0, 1.0);
+                  final isTriggered = progress >= 1.0;
+
                   return AnimatedPositioned(
                     duration: const Duration(milliseconds: 200),
                     curve: Curves.easeOutCubic,
-                    bottom: isVisible ? 78 : -80,
+                    bottom: isVisible
+                        ? (_controller.showUI ? 100.0 : 36.0)
+                        : -90.0,
                     left: 0,
                     right: 0,
                     child: Center(
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular(24),
-                        child: BackdropFilter(
-                          filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
-                          child: AnimatedContainer(
-                            duration: const Duration(milliseconds: 200),
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 16,
-                              vertical: 8,
-                            ),
-                            decoration: BoxDecoration(
-                              color: Colors.black.withValues(alpha: 0.85),
-                              borderRadius: BorderRadius.circular(24),
-                              border: Border.all(
-                                color: isTriggered
-                                    ? const Color(0xFF10B981)
-                                    : AppColors.primary.withValues(alpha: 0.6),
-                                width: 1.5,
+                      child: AnimatedOpacity(
+                        duration: const Duration(milliseconds: 180),
+                        opacity: isVisible ? 1.0 : 0.0,
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(28),
+                          child: BackdropFilter(
+                            filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
+                            child: AnimatedContainer(
+                              duration: const Duration(milliseconds: 200),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 16,
+                                vertical: 10,
                               ),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: (isTriggered
-                                          ? const Color(0xFF10B981)
-                                          : AppColors.primary)
-                                      .withValues(alpha: 0.35),
-                                  blurRadius: 12,
-                                ),
-                              ],
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Icon(
-                                  isTriggered
-                                      ? Icons.check_circle_rounded
-                                      : Icons.keyboard_arrow_down_rounded,
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF13151B)
+                                    .withValues(alpha: 0.90),
+                                borderRadius: BorderRadius.circular(28),
+                                border: Border.all(
                                   color: isTriggered
                                       ? const Color(0xFF10B981)
-                                      : AppColors.primary,
-                                  size: 18,
+                                      : AppColors.primary.withValues(
+                                          alpha: 0.4 + (progress * 0.4),
+                                        ),
+                                  width: isTriggered ? 1.8 : 1.2,
                                 ),
-                                const SizedBox(width: 8),
-                                Text(
-                                  isTriggered
-                                      ? 'Release for Next Chapter'
-                                      : 'Pull for Next Chapter (${(overscroll / 150 * 100).clamp(0, 100).toInt()}%)',
-                                  style: TextStyle(
-                                    color: isTriggered
-                                        ? const Color(0xFF10B981)
-                                        : Colors.white,
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.bold,
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: (isTriggered
+                                            ? const Color(0xFF10B981)
+                                            : AppColors.primary)
+                                        .withValues(
+                                      alpha:
+                                          isTriggered ? 0.45 : (progress * 0.3),
+                                    ),
+                                    blurRadius: isTriggered ? 16 : 8,
+                                    spreadRadius: isTriggered ? 1 : 0,
                                   ),
-                                ),
-                              ],
+                                ],
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  if (!hasNextChapter) ...[
+                                    const Icon(
+                                      Icons.check_circle_outline_rounded,
+                                      color: Colors.white70,
+                                      size: 20,
+                                    ),
+                                    const SizedBox(width: 8),
+                                    const Text(
+                                      'Latest Chapter Reached',
+                                      style: TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                  ] else ...[
+                                    SizedBox(
+                                      width: 22,
+                                      height: 22,
+                                      child: Stack(
+                                        alignment: Alignment.center,
+                                        children: [
+                                          CircularProgressIndicator(
+                                            value: progress,
+                                            strokeWidth: 2.5,
+                                            backgroundColor: Colors.white12,
+                                            valueColor:
+                                                AlwaysStoppedAnimation<Color>(
+                                              isTriggered
+                                                  ? const Color(0xFF10B981)
+                                                  : AppColors.primary,
+                                            ),
+                                          ),
+                                          AnimatedRotation(
+                                            turns: isTriggered ? 0.5 : 0.0,
+                                            duration: const Duration(
+                                              milliseconds: 200,
+                                            ),
+                                            child: Icon(
+                                              isTriggered
+                                                  ? Icons.check_rounded
+                                                  : Icons.arrow_upward_rounded,
+                                              color: isTriggered
+                                                  ? const Color(0xFF10B981)
+                                                  : Colors.white,
+                                              size: 13,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                    const SizedBox(width: 10),
+                                    Text(
+                                      isTriggered
+                                          ? 'Release for Next Chapter'
+                                          : 'Pull for Next Chapter • ${(progress * 100).toInt()}%',
+                                      style: TextStyle(
+                                        color: isTriggered
+                                            ? const Color(0xFF10B981)
+                                            : Colors.white,
+                                        fontSize: 13,
+                                        fontWeight: isTriggered
+                                            ? FontWeight.bold
+                                            : FontWeight.w600,
+                                      ),
+                                    ),
+                                  ],
+                                ],
+                              ),
                             ),
                           ),
                         ),
