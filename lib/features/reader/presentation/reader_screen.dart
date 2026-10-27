@@ -814,7 +814,8 @@ class _ReaderScreenState extends State<ReaderScreen>
           backgroundColor: Colors.black,
           body: Stack(
             children: [
-              NotificationListener<ScrollNotification>(
+              Positioned.fill(
+                child: NotificationListener<ScrollNotification>(
                 onNotification: (notification) {
                   if (notification is UserScrollNotification) {
                     _targetScrollOffset = null;
@@ -964,6 +965,7 @@ class _ReaderScreenState extends State<ReaderScreen>
                   ),
                 ),
               ),
+            ),
 
               // Dedicated Error State & Retry Overlay (Center of reader)
               if (_controller.errorMessage != null &&

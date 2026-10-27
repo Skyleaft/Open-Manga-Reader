@@ -123,8 +123,7 @@ class _ReaderContentWidgetState extends State<ReaderContentWidget> {
     final screenWidth = MediaQuery.of(context).size.width;
     final contentWidth = math.min(screenWidth, 800.0);
 
-    return Positioned.fill(
-      child: GestureDetector(
+    return GestureDetector(
         onTap: widget.onTap,
         onDoubleTapDown: widget.onDoubleTapDown,
         onDoubleTap: widget.onDoubleTap,
@@ -443,7 +442,6 @@ class _ReaderContentWidgetState extends State<ReaderContentWidget> {
                   );
                 },
               ),
-      ),
-    );
+      );
   }
 }

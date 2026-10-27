@@ -26,7 +26,8 @@ void main() {
           home: Scaffold(
             body: Stack(
               children: [
-                ReaderContentWidget(
+                Positioned.fill(
+                  child: ReaderContentWidget(
                   pageUrls: const ['https://img.com/1.jpg'],
                   isLoading: true,
                   showUI: true,
@@ -39,6 +40,7 @@ void main() {
                   onDoubleTapDown: (_) {},
                   onDoubleTap: () {},
                   onToggleUI: () {},
+                ),
                 ),
               ],
             ),
@@ -60,7 +62,8 @@ void main() {
           home: Scaffold(
             body: Stack(
               children: [
-                ReaderContentWidget(
+                Positioned.fill(
+                  child: ReaderContentWidget(
                   chapterId: 'ch-test',
                   pageUrls: const ['https://img.com/1.jpg', 'https://img.com/2.jpg'],
                   isLoading: false,
@@ -76,6 +79,7 @@ void main() {
                   onDoubleTapDown: (_) {},
                   onDoubleTap: () {},
                   onToggleUI: () {},
+                ),
                 ),
               ],
             ),
@@ -96,7 +100,8 @@ void main() {
           home: Scaffold(
             body: Stack(
               children: [
-                ReaderContentWidget(
+                Positioned.fill(
+                  child: ReaderContentWidget(
                   chapterId: 'ch-test',
                   pageUrls: const ['https://img.com/1.jpg', 'https://img.com/2.jpg'],
                   isLoading: false,
@@ -111,6 +116,7 @@ void main() {
                   onDoubleTapDown: (_) {},
                   onDoubleTap: () {},
                   onToggleUI: () {},
+                ),
                 ),
               ],
             ),
