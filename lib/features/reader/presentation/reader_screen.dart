@@ -42,7 +42,9 @@ class _ReaderScreenState extends State<ReaderScreen>
   final Map<int, GlobalKey> _pageKeys = {};
   TapDownDetails? _doubleTapDetails;
   double? _targetScrollOffset;
+  static const double _pullToNextThreshold = 90.0;
   bool _isPullToNextArmed = false;
+  int _lastOverscrollMilestone = 0;
   Timer? _overscrollResetTimer;
 
   @override
@@ -331,11 +333,52 @@ class _ReaderScreenState extends State<ReaderScreen>
     }
   }
 
+  void _updatePullToNextOverscroll(
+    double overscrollAmount, {
+    bool isInteractive = true,
+  }) {
+    _controller.setAccumulatedBottomOverscroll(overscrollAmount);
+
+    final double progress =
+        (overscrollAmount / _pullToNextThreshold).clamp(0.0, 1.0);
+    // Discrete tactile intervals: 0: 0-24%, 1: 25-49%, 2: 50-74%, 3: 75-99%, 4: 100%
+    final int currentMilestone = (progress * 4).floor().clamp(0, 4);
+
+    if (currentMilestone > _lastOverscrollMilestone) {
+      if (currentMilestone == 4) {
+        if (!_isPullToNextArmed) {
+          _isPullToNextArmed = true;
+          if (isInteractive) {
+            HapticFeedback.mediumImpact();
+          }
+        }
+      } else {
+        if (isInteractive) {
+          HapticFeedback.selectionClick();
+        }
+      }
+      _lastOverscrollMilestone = currentMilestone;
+    } else if (currentMilestone < _lastOverscrollMilestone) {
+      if (_isPullToNextArmed && currentMilestone < 4) {
+        _isPullToNextArmed = false;
+        if (isInteractive) {
+          HapticFeedback.selectionClick();
+        }
+      }
+      _lastOverscrollMilestone = currentMilestone;
+    }
+  }
+
+  void _resetPullToNextOverscroll() {
+    _controller.setAccumulatedBottomOverscroll(0.0);
+    _isPullToNextArmed = false;
+    _lastOverscrollMilestone = 0;
+  }
+
   void _triggerPullToNextChapter() {
     if (_controller.isLoading || _controller.isChangingChapter) return;
-    _isPullToNextArmed = false;
     _overscrollResetTimer?.cancel();
-    _controller.setAccumulatedBottomOverscroll(0.0);
+    _resetPullToNextOverscroll();
     HapticFeedback.mediumImpact();
     _changeChapter(true);
   }
@@ -841,16 +884,10 @@ class _ReaderScreenState extends State<ReaderScreen>
                           1.0,
                         );
                       }
-                      _controller.addAccumulatedBottomOverscroll(
-                        notification.overscroll,
+                      _updatePullToNextOverscroll(
+                        _controller.accumulatedBottomOverscroll +
+                            notification.overscroll,
                       );
-
-                      if (_controller.accumulatedBottomOverscroll >= 90.0) {
-                        if (!_isPullToNextArmed) {
-                          _isPullToNextArmed = true;
-                          HapticFeedback.lightImpact();
-                        }
-                      }
 
                       _overscrollResetTimer?.cancel();
                       _overscrollResetTimer = Timer(
@@ -864,8 +901,7 @@ class _ReaderScreenState extends State<ReaderScreen>
                           if (_isPullToNextArmed) {
                             _triggerPullToNextChapter();
                           } else {
-                            _controller.setAccumulatedBottomOverscroll(0);
-                            _isPullToNextArmed = false;
+                            _resetPullToNextOverscroll();
                           }
                         },
                       );
@@ -897,23 +933,14 @@ class _ReaderScreenState extends State<ReaderScreen>
                         final overscrollAmount =
                             notification.metrics.pixels -
                                 notification.metrics.maxScrollExtent;
-                        _controller.setAccumulatedBottomOverscroll(
+                        _updatePullToNextOverscroll(
                           overscrollAmount,
+                          isInteractive: notification.dragDetails != null,
                         );
-
-                        if (overscrollAmount >= 90.0) {
-                          if (!_isPullToNextArmed) {
-                            _isPullToNextArmed = true;
-                            HapticFeedback.lightImpact();
-                          }
-                        } else {
-                          _isPullToNextArmed = false;
-                        }
                       } else if (notification.metrics.pixels <
                               notification.metrics.maxScrollExtent - 20 &&
                           _controller.accumulatedBottomOverscroll > 0) {
-                        _controller.setAccumulatedBottomOverscroll(0);
-                        _isPullToNextArmed = false;
+                        _resetPullToNextOverscroll();
                       }
                     }
                   } else if (notification is ScrollEndNotification) {
@@ -922,8 +949,7 @@ class _ReaderScreenState extends State<ReaderScreen>
                         !_controller.isChangingChapter) {
                       _triggerPullToNextChapter();
                     } else {
-                      _controller.setAccumulatedBottomOverscroll(0);
-                      _isPullToNextArmed = false;
+                      _resetPullToNextOverscroll();
                     }
                   }
                   return false;
@@ -1207,7 +1233,7 @@ class _ReaderScreenState extends State<ReaderScreen>
                 valueListenable: _controller.accumulatedBottomOverscrollNotifier,
                 builder: (context, overscroll, _) {
                   final isVisible = overscroll > 5;
-                  const double threshold = 90.0;
+                  const double threshold = _pullToNextThreshold;
                   final double progress =
                       (overscroll / threshold).clamp(0.0, 1.0);
                   final isTriggered = progress >= 1.0;
@@ -1224,113 +1250,123 @@ class _ReaderScreenState extends State<ReaderScreen>
                       child: AnimatedOpacity(
                         duration: const Duration(milliseconds: 180),
                         opacity: isVisible ? 1.0 : 0.0,
-                        child: ClipRRect(
-                          borderRadius: BorderRadius.circular(28),
-                          child: BackdropFilter(
-                            filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
-                            child: AnimatedContainer(
-                              duration: const Duration(milliseconds: 200),
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 16,
-                                vertical: 10,
-                              ),
-                              decoration: BoxDecoration(
-                                color: const Color(0xFF13151B)
-                                    .withValues(alpha: 0.90),
-                                borderRadius: BorderRadius.circular(28),
-                                border: Border.all(
-                                  color: isTriggered
-                                      ? const Color(0xFF10B981)
-                                      : AppColors.primary.withValues(
-                                          alpha: 0.4 + (progress * 0.4),
-                                        ),
-                                  width: isTriggered ? 1.8 : 1.2,
+                        child: GestureDetector(
+                          onTap: () {
+                            if (hasNextChapter &&
+                                !_controller.isLoading &&
+                                !_controller.isChangingChapter) {
+                              HapticFeedback.mediumImpact();
+                              _triggerPullToNextChapter();
+                            }
+                          },
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(28),
+                            child: BackdropFilter(
+                              filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
+                              child: AnimatedContainer(
+                                duration: const Duration(milliseconds: 200),
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 16,
+                                  vertical: 10,
                                 ),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: (isTriggered
-                                            ? const Color(0xFF10B981)
-                                            : AppColors.primary)
-                                        .withValues(
-                                      alpha:
-                                          isTriggered ? 0.45 : (progress * 0.3),
-                                    ),
-                                    blurRadius: isTriggered ? 16 : 8,
-                                    spreadRadius: isTriggered ? 1 : 0,
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFF13151B)
+                                      .withValues(alpha: 0.90),
+                                  borderRadius: BorderRadius.circular(28),
+                                  border: Border.all(
+                                    color: isTriggered
+                                        ? const Color(0xFF10B981)
+                                        : AppColors.primary.withValues(
+                                            alpha: 0.4 + (progress * 0.4),
+                                          ),
+                                    width: isTriggered ? 1.8 : 1.2,
                                   ),
-                                ],
-                              ),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  if (!hasNextChapter) ...[
-                                    const Icon(
-                                      Icons.check_circle_outline_rounded,
-                                      color: Colors.white70,
-                                      size: 20,
-                                    ),
-                                    const SizedBox(width: 8),
-                                    const Text(
-                                      'Latest Chapter Reached',
-                                      style: TextStyle(
-                                        color: Colors.white,
-                                        fontSize: 13,
-                                        fontWeight: FontWeight.w600,
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: (isTriggered
+                                              ? const Color(0xFF10B981)
+                                              : AppColors.primary)
+                                          .withValues(
+                                        alpha:
+                                            isTriggered ? 0.45 : (progress * 0.3),
                                       ),
-                                    ),
-                                  ] else ...[
-                                    SizedBox(
-                                      width: 22,
-                                      height: 22,
-                                      child: Stack(
-                                        alignment: Alignment.center,
-                                        children: [
-                                          CircularProgressIndicator(
-                                            value: progress,
-                                            strokeWidth: 2.5,
-                                            backgroundColor: Colors.white12,
-                                            valueColor:
-                                                AlwaysStoppedAnimation<Color>(
-                                              isTriggered
-                                                  ? const Color(0xFF10B981)
-                                                  : AppColors.primary,
-                                            ),
-                                          ),
-                                          AnimatedRotation(
-                                            turns: isTriggered ? 0.5 : 0.0,
-                                            duration: const Duration(
-                                              milliseconds: 200,
-                                            ),
-                                            child: Icon(
-                                              isTriggered
-                                                  ? Icons.check_rounded
-                                                  : Icons.arrow_upward_rounded,
-                                              color: isTriggered
-                                                  ? const Color(0xFF10B981)
-                                                  : Colors.white,
-                                              size: 13,
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                    const SizedBox(width: 10),
-                                    Text(
-                                      isTriggered
-                                          ? 'Release for Next Chapter'
-                                          : 'Pull for Next Chapter • ${(progress * 100).toInt()}%',
-                                      style: TextStyle(
-                                        color: isTriggered
-                                            ? const Color(0xFF10B981)
-                                            : Colors.white,
-                                        fontSize: 13,
-                                        fontWeight: isTriggered
-                                            ? FontWeight.bold
-                                            : FontWeight.w600,
-                                      ),
+                                      blurRadius: isTriggered ? 16 : 8,
+                                      spreadRadius: isTriggered ? 1 : 0,
                                     ),
                                   ],
-                                ],
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    if (!hasNextChapter) ...[
+                                      const Icon(
+                                        Icons.check_circle_outline_rounded,
+                                        color: Colors.white70,
+                                        size: 20,
+                                      ),
+                                      const SizedBox(width: 8),
+                                      const Text(
+                                        'Latest Chapter Reached',
+                                        style: TextStyle(
+                                          color: Colors.white,
+                                          fontSize: 13,
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                      ),
+                                    ] else ...[
+                                      SizedBox(
+                                        width: 22,
+                                        height: 22,
+                                        child: Stack(
+                                          alignment: Alignment.center,
+                                          children: [
+                                            CircularProgressIndicator(
+                                              value: progress,
+                                              strokeWidth: 2.5,
+                                              backgroundColor: Colors.white12,
+                                              valueColor:
+                                                  AlwaysStoppedAnimation<Color>(
+                                                isTriggered
+                                                    ? const Color(0xFF10B981)
+                                                    : AppColors.primary,
+                                              ),
+                                            ),
+                                            AnimatedRotation(
+                                              turns: isTriggered ? 0.5 : 0.0,
+                                              duration: const Duration(
+                                                milliseconds: 200,
+                                              ),
+                                              child: Icon(
+                                                isTriggered
+                                                    ? Icons.check_rounded
+                                                    : Icons.arrow_upward_rounded,
+                                                color: isTriggered
+                                                    ? const Color(0xFF10B981)
+                                                    : Colors.white,
+                                                size: 13,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                      const SizedBox(width: 10),
+                                      Text(
+                                        isTriggered
+                                            ? 'Release for Next Chapter'
+                                            : 'Pull for Next Chapter • ${(progress * 100).toInt()}%',
+                                        style: TextStyle(
+                                          color: isTriggered
+                                              ? const Color(0xFF10B981)
+                                              : Colors.white,
+                                          fontSize: 13,
+                                          fontWeight: isTriggered
+                                              ? FontWeight.bold
+                                              : FontWeight.w600,
+                                        ),
+                                      ),
+                                    ],
+                                  ],
+                                ),
                               ),
                             ),
                           ),
