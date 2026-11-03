@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:cached_network_image_ce/cached_network_image.dart';
+import 'package:flutter_cache_manager/flutter_cache_manager.dart' as fcm;
 import 'package:flutter_avif/flutter_avif.dart';
 import '../../../../core/utils/url_utils.dart';
 
@@ -43,10 +44,10 @@ class AppNetworkImage extends StatefulWidget {
   });
 
   @override
-  State<AppNetworkImage> createState() => _AppNetworkImageState();
+  State<AppNetworkImage> createState() => AppNetworkImageState();
 }
 
-class _AppNetworkImageState extends State<AppNetworkImage> {
+class AppNetworkImageState extends State<AppNetworkImage> {
   int _retryCount = 0;
   bool _isRetrying = false;
   bool _aspectRatioReported = false;
@@ -69,21 +70,93 @@ class _AppNetworkImageState extends State<AppNetworkImage> {
     }
   }
 
-  Future<void> _forceReload() async {
+  bool _isNetworkError(Object error) {
+    if (error is SocketException ||
+        error is HttpException ||
+        error is TimeoutException ||
+        error is HandshakeException ||
+        error is TlsException) {
+      return true;
+    }
+    final errStr = error.toString().toLowerCase();
+    return errStr.contains('socket') ||
+        errStr.contains('connection') ||
+        errStr.contains('timeout') ||
+        errStr.contains('handshake') ||
+        errStr.contains('host') ||
+        errStr.contains('network') ||
+        errStr.contains('failed host lookup') ||
+        errStr.contains('403') ||
+        errStr.contains('404') ||
+        errStr.contains('500') ||
+        errStr.contains('502') ||
+        errStr.contains('503') ||
+        errStr.contains('504');
+  }
+
+  bool _isAvifCandidate(String url, Object error) {
+    if (url.toLowerCase().contains('.avif')) return true;
+    final errStr = error.toString().toLowerCase();
+    return error is UnsupportedImageFormatException ||
+        errStr.contains('codec') ||
+        errStr.contains('decode') ||
+        errStr.contains('avif') ||
+        errStr.contains('unsupported');
+  }
+
+  Future<void> forceReload() async {
     if (_isRetrying) return;
     final url = _effectiveImageUrl;
+    if (url.isEmpty) return;
+
     setState(() {
       _isRetrying = true;
       _retryCount++;
       _disableMemCache = true; // Always disable memCache on manual retry
+      _isAvifFallback = false; // Always reset AVIF fallback on manual retry
+      _aspectRatioReported = false;
     });
 
     try {
-      await CachedNetworkImageProvider(
-        url,
-        headers: widget.httpHeaders,
-      ).evict();
-    } catch (_) {}
+      final isLocal = UrlUtils.isLocalFilePath(url);
+      if (isLocal) {
+        final normalizedPath = UrlUtils.normalizeLocalFilePath(url);
+        final file = File(normalizedPath);
+        await FileImage(file).evict();
+      } else {
+        try {
+          await CachedNetworkImage.evictFromCache(
+            url,
+            cacheKey: url,
+          ).timeout(const Duration(seconds: 2));
+        } catch (_) {}
+        try {
+          await fcm.DefaultCacheManager()
+              .removeFile(url)
+              .timeout(const Duration(seconds: 2));
+        } catch (_) {}
+        try {
+          await CachedNetworkImageProvider(
+            url,
+            headers: widget.httpHeaders,
+            maxHeight: widget.maxHeightDiskCache,
+            maxWidth: widget.maxWidthDiskCache,
+          ).evict();
+        } catch (_) {}
+        try {
+          await CachedNetworkAvifImageProvider(
+            url,
+            headers: widget.httpHeaders,
+          ).evict();
+        } catch (_) {}
+      }
+      PaintingBinding.instance.imageCache.clear();
+      PaintingBinding.instance.imageCache.clearLiveImages();
+    } catch (e) {
+      if (kDebugMode) {
+        debugPrint('🖼️ [IMAGE RELOAD ERR] $url evict error: $e');
+      }
+    }
 
     if (mounted) {
       setState(() {
@@ -114,7 +187,11 @@ class _AppNetworkImageState extends State<AppNetworkImage> {
         alignment: Alignment.center,
         children: [
           widget.errorWidget!,
-          _buildRetryButton(),
+          Container(
+            color: Colors.black38,
+            alignment: Alignment.center,
+            child: _buildRetryButton(),
+          ),
         ],
       );
     }
@@ -160,19 +237,21 @@ class _AppNetworkImageState extends State<AppNetworkImage> {
 
   Widget _buildRetryButton() {
     return Material(
-      color: Colors.transparent,
+      color: Colors.black87,
+      borderRadius: BorderRadius.circular(20),
       child: InkWell(
-        onTap: _isRetrying ? null : _forceReload,
+        onTap: _isRetrying ? null : forceReload,
         borderRadius: BorderRadius.circular(20),
         child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+          constraints: const BoxConstraints(minHeight: 40, minWidth: 120),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
           decoration: BoxDecoration(
-            color: Colors.white.withValues(alpha: 0.12),
             borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: Colors.white24),
+            border: Border.all(color: Colors.white38, width: 1.2),
           ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
+            mainAxisAlignment: MainAxisAlignment.center,
             children: [
               if (_isRetrying)
                 const SizedBox(
@@ -189,7 +268,7 @@ class _AppNetworkImageState extends State<AppNetworkImage> {
                   color: Colors.white,
                   size: 16,
                 ),
-              const SizedBox(width: 6),
+              const SizedBox(width: 8),
               Text(
                 _isRetrying ? 'Retrying...' : 'Tap to Retry',
                 style: const TextStyle(
@@ -260,8 +339,10 @@ class _AppNetworkImageState extends State<AppNetworkImage> {
         height: widget.height,
         gaplessPlayback: widget.gaplessPlayback,
         frameBuilder: (context, child, frame, wasSynchronouslyLoaded) {
-          if (frame != null &&
-              !_aspectRatioReported &&
+          if (frame == null) {
+            return _buildPlaceholder();
+          }
+          if (!_aspectRatioReported &&
               widget.onAspectRatioResolved != null) {
             final stream = FileImage(file).resolve(const ImageConfiguration());
             late final ImageStreamListener listener;
@@ -302,9 +383,15 @@ class _AppNetworkImageState extends State<AppNetworkImage> {
         height: widget.height,
         headers: widget.httpHeaders,
         gaplessPlayback: widget.gaplessPlayback,
+        loadingBuilder: (context, child, loadingProgress) {
+          if (loadingProgress == null) return child;
+          return _buildPlaceholder();
+        },
         frameBuilder: (context, child, frame, wasSynchronouslyLoaded) {
-          if (frame != null &&
-              !_aspectRatioReported &&
+          if (frame == null) {
+            return _buildPlaceholder();
+          }
+          if (!_aspectRatioReported &&
               widget.onAspectRatioResolved != null) {
             final stream = CachedNetworkAvifImageProvider(
               url,
@@ -351,11 +438,47 @@ class _AppNetworkImageState extends State<AppNetworkImage> {
       memCacheHeight: _disableMemCache ? null : widget.memCacheHeight,
       maxHeightDiskCache: widget.maxHeightDiskCache,
       maxWidthDiskCache: widget.maxWidthDiskCache,
+      unsupportedImageBuilder: (context, url, bytes) {
+        return AvifImage.memory(
+          bytes,
+          key: _imageKey,
+          fit: widget.fit,
+          width: widget.width,
+          height: widget.height,
+          gaplessPlayback: widget.gaplessPlayback,
+          frameBuilder: (context, child, frame, wasSynchronouslyLoaded) {
+            if (frame != null &&
+                !_aspectRatioReported &&
+                widget.onAspectRatioResolved != null) {
+              final stream = MemoryAvifImage(bytes).resolve(const ImageConfiguration());
+              late final ImageStreamListener listener;
+              listener = ImageStreamListener(
+                (info, _) {
+                  final w = info.image.width;
+                  final h = info.image.height;
+                  if (w > 0 && mounted && !_aspectRatioReported) {
+                    _aspectRatioReported = true;
+                    widget.onAspectRatioResolved?.call(h / w);
+                  }
+                  stream.removeListener(listener);
+                },
+                onError: (_, _) {
+                  stream.removeListener(listener);
+                },
+              );
+              stream.addListener(listener);
+            }
+            return child;
+          },
+          errorBuilder: (context, error, stackTrace) => _buildErrorWidget(),
+        );
+      },
       errorListener: (error) {
         if (kDebugMode) {
-          debugPrint('🖼️ [IMAGE ERR] $url -> Error: $error (switching to AVIF decoder)');
+          debugPrint('🖼️ [IMAGE ERR] $url -> Error: $error');
         }
-        if (!_isAvifFallback) {
+        final isNetworkErr = _isNetworkError(error);
+        if (!isNetworkErr && !_isAvifFallback && _isAvifCandidate(url, error)) {
           if (mounted) {
             setState(() {
               _isAvifFallback = true;
@@ -369,6 +492,8 @@ class _AppNetworkImageState extends State<AppNetworkImage> {
           CachedNetworkImageProvider(
             url,
             headers: widget.httpHeaders,
+            maxHeight: widget.maxHeightDiskCache,
+            maxWidth: widget.maxWidthDiskCache,
           ).evict();
         } catch (_) {}
       },
