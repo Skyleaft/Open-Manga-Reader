@@ -348,39 +348,185 @@ class MangaDetailFloatingDock extends StatelessWidget {
     bool isDark,
     ColorScheme colorScheme,
   ) {
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: () {
-          HapticFeedback.lightImpact();
-          onToggleFavorite();
-        },
-        borderRadius: BorderRadius.circular(25),
-        child: Container(
-          width: 50,
-          height: 50,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            color: isFavorite
-                ? const Color(0xFFEF4444).withValues(alpha: isDark ? 0.22 : 0.15)
-                : (isDark
-                    ? Colors.white.withValues(alpha: 0.08)
-                    : Colors.black.withValues(alpha: 0.05)),
-            border: Border.all(
-              color: isFavorite
-                  ? const Color(0xFFEF4444).withValues(alpha: 0.4)
-                  : (isDark
-                      ? Colors.white.withValues(alpha: 0.12)
-                      : Colors.black.withValues(alpha: 0.08)),
-              width: 1,
+    return FavoriteButton(
+      isFavorite: isFavorite,
+      onTap: onToggleFavorite,
+      isDark: isDark,
+    );
+  }
+}
+
+class FavoriteButton extends StatefulWidget {
+  final bool isFavorite;
+  final VoidCallback onTap;
+  final bool isDark;
+
+  const FavoriteButton({
+    super.key,
+    required this.isFavorite,
+    required this.onTap,
+    required this.isDark,
+  });
+
+  @override
+  State<FavoriteButton> createState() => _FavoriteButtonState();
+}
+
+class _FavoriteButtonState extends State<FavoriteButton>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller;
+  late final Animation<double> _scaleAnimation;
+  late final Animation<double> _iconScaleAnimation;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      duration: const Duration(milliseconds: 450),
+      vsync: this,
+    );
+
+    // Subtle whole-button compression and spring release
+    _scaleAnimation = TweenSequence<double>([
+      TweenSequenceItem(
+        tween: Tween<double>(begin: 1.0, end: 0.88)
+            .chain(CurveTween(curve: Curves.easeInOut)),
+        weight: 25,
+      ),
+      TweenSequenceItem(
+        tween: Tween<double>(begin: 0.88, end: 1.08)
+            .chain(CurveTween(curve: Curves.easeOutBack)),
+        weight: 40,
+      ),
+      TweenSequenceItem(
+        tween: Tween<double>(begin: 1.08, end: 1.0)
+            .chain(CurveTween(curve: Curves.easeInOut)),
+        weight: 35,
+      ),
+    ]).animate(_controller);
+
+    // Heart icon energetic bounce and pop
+    _iconScaleAnimation = TweenSequence<double>([
+      TweenSequenceItem(
+        tween: Tween<double>(begin: 1.0, end: 0.7)
+            .chain(CurveTween(curve: Curves.easeInOut)),
+        weight: 20,
+      ),
+      TweenSequenceItem(
+        tween: Tween<double>(begin: 0.7, end: 1.35)
+            .chain(CurveTween(curve: Curves.easeOutBack)),
+        weight: 45,
+      ),
+      TweenSequenceItem(
+        tween: Tween<double>(begin: 1.35, end: 0.95)
+            .chain(CurveTween(curve: Curves.easeInOut)),
+        weight: 20,
+      ),
+      TweenSequenceItem(
+        tween: Tween<double>(begin: 0.95, end: 1.0)
+            .chain(CurveTween(curve: Curves.easeOut)),
+        weight: 15,
+      ),
+    ]).animate(_controller);
+  }
+
+  @override
+  void didUpdateWidget(covariant FavoriteButton oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.isFavorite != oldWidget.isFavorite && !_controller.isAnimating) {
+      _controller.forward(from: 0.0);
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  void _handleTap() {
+    final nextState = !widget.isFavorite;
+    if (nextState) {
+      HapticFeedback.mediumImpact();
+    } else {
+      HapticFeedback.lightImpact();
+    }
+
+    _controller.forward(from: 0.0);
+    widget.onTap();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    const favoriteColor = Color(0xFFEF4444);
+    final isFav = widget.isFavorite;
+
+    return Tooltip(
+      message: isFav ? 'Remove from favorites' : 'Add to favorites',
+      child: ScaleTransition(
+        scale: _scaleAnimation,
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            onTap: _handleTap,
+            borderRadius: BorderRadius.circular(25),
+            splashColor: favoriteColor.withValues(alpha: 0.2),
+            highlightColor: favoriteColor.withValues(alpha: 0.1),
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 300),
+              curve: Curves.easeOutCubic,
+              width: 50,
+              height: 50,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: isFav
+                    ? favoriteColor.withValues(alpha: widget.isDark ? 0.22 : 0.15)
+                    : (widget.isDark
+                        ? Colors.white.withValues(alpha: 0.08)
+                        : Colors.black.withValues(alpha: 0.05)),
+                border: Border.all(
+                  color: isFav
+                      ? favoriteColor.withValues(alpha: 0.45)
+                      : (widget.isDark
+                          ? Colors.white.withValues(alpha: 0.12)
+                          : Colors.black.withValues(alpha: 0.08)),
+                  width: 1,
+                ),
+                boxShadow: isFav
+                    ? [
+                        BoxShadow(
+                          color: favoriteColor.withValues(alpha: widget.isDark ? 0.28 : 0.18),
+                          blurRadius: 10,
+                          offset: const Offset(0, 2),
+                        ),
+                      ]
+                    : null,
+              ),
+              child: Center(
+                child: ScaleTransition(
+                  scale: _iconScaleAnimation,
+                  child: AnimatedSwitcher(
+                    duration: const Duration(milliseconds: 250),
+                    transitionBuilder: (child, animation) {
+                      return ScaleTransition(
+                        scale: animation,
+                        child: child,
+                      );
+                    },
+                    child: Icon(
+                      isFav
+                          ? Icons.favorite_rounded
+                          : Icons.favorite_border_rounded,
+                      key: ValueKey<bool>(isFav),
+                      color: isFav
+                          ? favoriteColor
+                          : (widget.isDark ? Colors.white70 : Colors.black87),
+                      size: 22,
+                    ),
+                  ),
+                ),
+              ),
             ),
-          ),
-          child: Icon(
-            isFavorite ? Icons.favorite_rounded : Icons.favorite_border_rounded,
-            color: isFavorite
-                ? const Color(0xFFEF4444)
-                : (isDark ? Colors.white70 : Colors.black87),
-            size: 22,
           ),
         ),
       ),
