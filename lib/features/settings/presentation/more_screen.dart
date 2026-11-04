@@ -50,6 +50,7 @@ class _MoreScreenState extends State<MoreScreen>
   List<MangaProgression> _progressions = [];
   Map<String, Map<String, dynamic>> _mangaDetailsMap = {};
   bool _isLoadingStats = true;
+  bool _isLoggingOut = false;
   int _totalChaptersRead = 0;
   int _totalReadingTimeSeconds = 0;
   int _cacheSizeBytes = 0;
@@ -76,6 +77,7 @@ class _MoreScreenState extends State<MoreScreen>
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
+    if (_isLoggingOut) return;
     final auth = Provider.of<AuthService>(context, listen: false);
     final uid = auth.currentUser?.uid;
     if (_currentUid != null && _currentUid != uid) {
@@ -88,12 +90,12 @@ class _MoreScreenState extends State<MoreScreen>
   }
 
   void _onProgressionChanged() {
-    if (!mounted) return;
+    if (!mounted || _isLoggingOut) return;
     _loadStats(silent: true);
   }
 
   void _onDownloadsChanged() {
-    if (!mounted) return;
+    if (!mounted || _isLoggingOut) return;
     _loadStorageSizes();
   }
 
@@ -340,20 +342,23 @@ class _MoreScreenState extends State<MoreScreen>
     final authService = Provider.of<AuthService>(context);
     final themeProvider = Provider.of<ThemeProvider>(context);
 
-    return Scaffold(
-      backgroundColor:
-          isDark ? AppColors.backgroundDark : AppColors.backgroundLight,
-      body: SafeArea(
-        child: RefreshIndicator(
-          color: Theme.of(context).colorScheme.primary,
-          onRefresh: () async {
-            await Future.wait([
-              _progressionService.refreshFromApi(),
-              _loadStorageSizes(),
-            ]);
-            await _loadStats(silent: false);
-          },
-          child: SingleChildScrollView(
+    return AbsorbPointer(
+      absorbing: _isLoggingOut,
+      child: Scaffold(
+        backgroundColor:
+            isDark ? AppColors.backgroundDark : AppColors.backgroundLight,
+        body: SafeArea(
+          child: RefreshIndicator(
+            color: Theme.of(context).colorScheme.primary,
+            onRefresh: () async {
+              if (_isLoggingOut) return;
+              await Future.wait([
+                _progressionService.refreshFromApi(),
+                _loadStorageSizes(),
+              ]);
+              await _loadStats(silent: false);
+            },
+            child: SingleChildScrollView(
             physics: const AlwaysScrollableScrollPhysics(
               parent: BouncingScrollPhysics(),
             ),
@@ -588,8 +593,9 @@ class _MoreScreenState extends State<MoreScreen>
           ),
         ),
       ),
-    );
-  }
+    ),
+  );
+}
 
   Widget _buildStatsCard(bool isDark) {
     if (_isLoadingStats) {
@@ -1244,36 +1250,74 @@ class _MoreScreenState extends State<MoreScreen>
     );
   }
 
+  Future<void> _handleLogout() async {
+    if (_isLoggingOut) return;
+
+    HapticFeedback.mediumImpact();
+    setState(() {
+      _isLoggingOut = true;
+    });
+
+    try {
+      final authService = Provider.of<AuthService>(context, listen: false);
+      await authService.signOut();
+      if (mounted) {
+        Navigator.pushReplacementNamed(context, AppRoutes.login);
+      }
+    } catch (e) {
+      debugPrint('Logout error: $e');
+      if (mounted) {
+        AlertBanner.show(
+          context,
+          'Failed to logout. Please try again.',
+          type: AlertBannerType.error,
+        );
+        setState(() {
+          _isLoggingOut = false;
+        });
+      }
+    }
+  }
+
   Widget _buildFooter(BuildContext context) {
-    final authService = Provider.of<AuthService>(context);
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final logoutColor = isDark ? Colors.red.shade400 : Colors.red.shade700;
+    final logoutBg = isDark
+        ? Colors.red.shade900.withValues(alpha: 0.2)
+        : Colors.red.shade50;
+
     return Column(
       children: [
         SizedBox(
           width: double.infinity,
           child: ElevatedButton.icon(
-            onPressed: () async {
-              try {
-                await authService.signOut();
-                if (context.mounted) {
-                  Navigator.pushReplacementNamed(context, '/login');
-                }
-              } catch (e) {
-                debugPrint('Logout error: $e');
-              }
-            },
-            icon: const Icon(Icons.logout),
-            label: const Text(
-              'Logout',
-              style: TextStyle(fontWeight: FontWeight.bold),
+            onPressed: _isLoggingOut ? null : _handleLogout,
+            icon: _isLoggingOut
+                ? SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      valueColor: AlwaysStoppedAnimation<Color>(logoutColor),
+                    ),
+                  )
+                : const Icon(Icons.logout),
+            label: Text(
+              _isLoggingOut ? 'Logging out...' : 'Logout',
+              style: const TextStyle(fontWeight: FontWeight.bold),
             ),
             style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.red.shade50,
-              foregroundColor: Colors.red.shade700,
+              backgroundColor: logoutBg,
+              foregroundColor: logoutColor,
+              disabledBackgroundColor: logoutBg.withValues(alpha: 0.6),
+              disabledForegroundColor: logoutColor.withValues(alpha: 0.6),
               elevation: 0,
               padding: const EdgeInsets.symmetric(vertical: 16),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(12),
-                side: BorderSide(color: Colors.red.withValues(alpha: 0.3)),
+                side: BorderSide(
+                  color: Colors.red.withValues(alpha: isDark ? 0.4 : 0.3),
+                ),
               ),
             ),
           ),
