@@ -123,11 +123,8 @@ class _DiscoverCardState extends State<DiscoverCard> {
                 fit: BoxFit.cover,
                 memCacheWidth: 400,
                 maxWidthDiskCache: 600,
-                placeholder: (_, _) => ShimmerBox(
-                  borderRadius: borderRadius,
-                ),
-                errorBuilder: (_, _, _) =>
-                    _buildPlaceholder(iconSize * 3),
+                placeholder: (_, _) => ShimmerBox(borderRadius: borderRadius),
+                errorBuilder: (_, _, _) => _buildPlaceholder(iconSize * 3),
               )
             else
               _buildPlaceholder(iconSize * 3),
@@ -162,8 +159,7 @@ class _DiscoverCardState extends State<DiscoverCard> {
                   vertical: 3.5,
                 ),
                 decoration: BoxDecoration(
-                  color: _getTypeColor(widget.type)
-                      .withValues(alpha: 0.9),
+                  color: _getTypeColor(widget.type).withValues(alpha: 0.9),
                   borderRadius: BorderRadius.circular(6),
                   boxShadow: [
                     BoxShadow(
@@ -192,8 +188,7 @@ class _DiscoverCardState extends State<DiscoverCard> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
-                  if (widget.status != null &&
-                      widget.status!.isNotEmpty)
+                  if (widget.status != null && widget.status!.isNotEmpty)
                     Container(
                       margin: const EdgeInsets.only(bottom: 4),
                       padding: const EdgeInsets.symmetric(
@@ -201,8 +196,9 @@ class _DiscoverCardState extends State<DiscoverCard> {
                         vertical: 3,
                       ),
                       decoration: BoxDecoration(
-                        color: _getStatusColor(widget.status)
-                            .withValues(alpha: 0.9),
+                        color: _getStatusColor(
+                          widget.status,
+                        ).withValues(alpha: 0.9),
                         borderRadius: BorderRadius.circular(6),
                         boxShadow: [
                           BoxShadow(
@@ -252,8 +248,7 @@ class _DiscoverCardState extends State<DiscoverCard> {
                         ),
                         const SizedBox(width: 2),
                         Text(
-                          (widget.rating == null ||
-                                  widget.rating == 0)
+                          (widget.rating == null || widget.rating == 0)
                               ? 'N/A'
                               : widget.rating!.toStringAsFixed(1),
                           style: GoogleFonts.inter(
@@ -280,7 +275,7 @@ class _DiscoverCardState extends State<DiscoverCard> {
                 children: [
                   if (widget.genres.isNotEmpty) ...[
                     Text(
-                      widget.genres.take(2).join(' • '),
+                      widget.genres.take(4).join(' • '),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: GoogleFonts.inter(
@@ -289,10 +284,7 @@ class _DiscoverCardState extends State<DiscoverCard> {
                         fontWeight: FontWeight.w500,
                         letterSpacing: 0.2,
                         shadows: const [
-                          Shadow(
-                            color: Colors.black87,
-                            blurRadius: 3,
-                          ),
+                          Shadow(color: Colors.black87, blurRadius: 3),
                         ],
                       ),
                     ),
@@ -330,8 +322,7 @@ class _DiscoverCardState extends State<DiscoverCard> {
                             vertical: 3.5,
                           ),
                           decoration: BoxDecoration(
-                            color: colorScheme.primary
-                                .withValues(alpha: 0.95),
+                            color: colorScheme.primary.withValues(alpha: 0.95),
                             borderRadius: BorderRadius.circular(6),
                             boxShadow: [
                               BoxShadow(
@@ -412,18 +403,19 @@ class _DiscoverCardState extends State<DiscoverCard> {
         transitionOnUserGestures: true,
         createRectTween: (begin, end) =>
             MaterialRectArcTween(begin: begin, end: end),
-        flightShuttleBuilder: (
-          flightContext,
-          animation,
-          flightDirection,
-          fromHeroContext,
-          toHeroContext,
-        ) {
-          return Material(
-            color: Colors.transparent,
-            child: toHeroContext.widget,
-          );
-        },
+        flightShuttleBuilder:
+            (
+              flightContext,
+              animation,
+              flightDirection,
+              fromHeroContext,
+              toHeroContext,
+            ) {
+              return Material(
+                color: Colors.transparent,
+                child: toHeroContext.widget,
+              );
+            },
         child: coverCard,
       );
     }
