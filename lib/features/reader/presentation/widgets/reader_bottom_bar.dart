@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'dart:ui';
 import '../../../../core/constants/app_colors.dart';
 
@@ -117,7 +118,10 @@ class ReaderBottomBar extends StatelessWidget {
       ),
       child: IconButton(
         icon: Icon(icon, color: Colors.white, size: 20),
-        onPressed: onTap,
+        onPressed: () {
+          HapticFeedback.lightImpact();
+          onTap();
+        },
         tooltip: tooltip,
         constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
         padding: EdgeInsets.zero,
@@ -149,6 +153,8 @@ class _SegmentedProgressBar extends StatefulWidget {
 
 class _SegmentedProgressBarState extends State<_SegmentedProgressBar> {
   double _dragProgress = 0.0;
+  bool _isDragging = false;
+  int? _lastHapticPage;
   final LayerLink _layerLink = LayerLink();
   OverlayEntry? _overlayEntry;
 
@@ -169,16 +175,17 @@ class _SegmentedProgressBarState extends State<_SegmentedProgressBar> {
               );
           final visualProgress =
               widget.isRtlMode ? (1.0 - _dragProgress) : _dragProgress;
+          final bubbleX = (visualProgress * width).clamp(22.0, width - 22.0);
 
           return Positioned(
-            width: 42,
-            height: 42,
+            width: 44,
+            height: 44,
             child: CompositedTransformFollower(
               link: _layerLink,
               showWhenUnlinked: false,
               targetAnchor: Alignment.topLeft,
               followerAnchor: Alignment.topLeft,
-              offset: Offset(visualProgress * width, 6),
+              offset: Offset(bubbleX, 4),
               child: IgnorePointer(
                 child: FractionalTranslation(
                   translation: const Offset(-0.5, -1.0),
@@ -189,16 +196,21 @@ class _SegmentedProgressBarState extends State<_SegmentedProgressBar> {
                       children: [
                         Container(
                           padding: const EdgeInsets.symmetric(
-                            horizontal: 6,
-                            vertical: 3,
+                            horizontal: 8,
+                            vertical: 4,
                           ),
                           decoration: BoxDecoration(
                             color: AppColors.primary,
-                            borderRadius: BorderRadius.circular(6),
+                            borderRadius: BorderRadius.circular(8),
                             boxShadow: [
                               BoxShadow(
+                                color: AppColors.primary.withValues(alpha: 0.4),
+                                blurRadius: 6,
+                                offset: const Offset(0, 2),
+                              ),
+                              BoxShadow(
                                 color: Colors.black.withValues(alpha: 0.3),
-                                blurRadius: 3,
+                                blurRadius: 4,
                                 offset: const Offset(0, 1),
                               ),
                             ],
@@ -236,10 +248,30 @@ class _SegmentedProgressBarState extends State<_SegmentedProgressBar> {
     _overlayEntry = null;
   }
 
+  void _startGesture(Offset localPosition, double width) {
+    if (width <= 0 || widget.totalPages <= 1) return;
+    _isDragging = true;
+    _lastHapticPage = null;
+    widget.onChangeStart(0);
+    HapticFeedback.lightImpact();
+    _handleGesture(localPosition, width);
+  }
+
   void _handleGesture(Offset localPosition, double width) {
     if (width <= 0 || widget.totalPages <= 1) return;
-    double rawProgress = (localPosition.dx / width).clamp(0.0, 1.0);
-    double progress = widget.isRtlMode ? (1.0 - rawProgress) : rawProgress;
+    final double rawProgress = (localPosition.dx / width).clamp(0.0, 1.0);
+    final double progress = widget.isRtlMode ? (1.0 - rawProgress) : rawProgress;
+
+    final int targetPage =
+        ((progress * (widget.totalPages - 1)).round() + 1).clamp(
+      1,
+      widget.totalPages,
+    );
+
+    if (_lastHapticPage != targetPage) {
+      _lastHapticPage = targetPage;
+      HapticFeedback.selectionClick();
+    }
 
     setState(() {
       _dragProgress = progress;
@@ -250,6 +282,13 @@ class _SegmentedProgressBarState extends State<_SegmentedProgressBar> {
   }
 
   void _endGesture() {
+    if (_isDragging) {
+      HapticFeedback.lightImpact();
+    }
+    setState(() {
+      _isDragging = false;
+      _lastHapticPage = null;
+    });
     _hideOverlay();
     widget.onChangeEnd(0);
   }
@@ -262,28 +301,43 @@ class _SegmentedProgressBarState extends State<_SegmentedProgressBar> {
       builder: (context, constraints) {
         final width = constraints.maxWidth;
 
+        final activePage = _isDragging
+            ? ((_dragProgress * (widget.totalPages - 1)).round() + 1).clamp(
+                1,
+                widget.totalPages,
+              )
+            : widget.currentPage;
+
         final segments = List.generate(widget.totalPages, (index) {
-          final isPassed = index < widget.currentPage;
-          final isCurrent = index == (widget.currentPage - 1);
+          final isPassed = index < activePage;
+          final isCurrent = index == (activePage - 1);
 
           return Expanded(
             child: AnimatedContainer(
-              duration: const Duration(milliseconds: 150),
+              duration: const Duration(milliseconds: 120),
+              curve: Curves.easeOutCubic,
               margin: EdgeInsets.symmetric(
                 horizontal: widget.totalPages > 50 ? 0.5 : 1.5,
               ),
-              height: isCurrent ? 8.0 : 4.0,
+              height: isCurrent
+                  ? (_isDragging ? 12.0 : 8.0)
+                  : (_isDragging ? 5.0 : 4.0),
               decoration: BoxDecoration(
-                color: isPassed ? AppColors.primary : Colors.white24,
-                borderRadius: BorderRadius.circular(2),
+                color: isPassed
+                    ? AppColors.primary
+                    : (isCurrent
+                        ? AppColors.primary
+                        : (_isDragging ? Colors.white38 : Colors.white24)),
+                borderRadius:
+                    BorderRadius.circular(isCurrent && _isDragging ? 3 : 2),
                 boxShadow: isCurrent
                     ? [
                         BoxShadow(
                           color: AppColors.primary.withValues(
-                            alpha: 0.5,
+                            alpha: _isDragging ? 0.75 : 0.5,
                           ),
-                          blurRadius: 4,
-                          spreadRadius: 1,
+                          blurRadius: _isDragging ? 6 : 4,
+                          spreadRadius: _isDragging ? 1.5 : 1,
                         ),
                       ]
                     : null,
@@ -299,31 +353,18 @@ class _SegmentedProgressBarState extends State<_SegmentedProgressBar> {
           link: _layerLink,
           child: GestureDetector(
             behavior: HitTestBehavior.opaque,
-            onPanStart: (details) {
-              widget.onChangeStart(0);
-              _handleGesture(details.localPosition, width);
-            },
-            onPanUpdate: (details) {
-              _handleGesture(details.localPosition, width);
-            },
-            onPanEnd: (_) {
-              _endGesture();
-            },
-            onPanCancel: () {
-              _endGesture();
-            },
-            onTapDown: (details) {
-              widget.onChangeStart(0);
-              _handleGesture(details.localPosition, width);
-            },
-            onTapUp: (_) {
-              _endGesture();
-            },
-            onTapCancel: () {
-              _endGesture();
-            },
+            onPanStart: (details) =>
+                _startGesture(details.localPosition, width),
+            onPanUpdate: (details) =>
+                _handleGesture(details.localPosition, width),
+            onPanEnd: (_) => _endGesture(),
+            onPanCancel: _endGesture,
+            onTapDown: (details) =>
+                _startGesture(details.localPosition, width),
+            onTapUp: (_) => _endGesture(),
+            onTapCancel: _endGesture,
             child: Container(
-              height: 32,
+              height: 36,
               alignment: Alignment.center,
               child: Row(
                 children: displaySegments,
