@@ -253,10 +253,28 @@ class AppTheme {
       ),
 
       // Typography
-      textTheme: GoogleFonts.interTextTheme(
-        baseTheme.textTheme,
-      ).apply(bodyColor: textColor, displayColor: textColor),
+      textTheme: _buildTextTheme(baseTheme.textTheme, textColor),
     );
+  }
+
+  static TextTheme _buildTextTheme(TextTheme base, Color textColor) {
+    return TextTheme(
+      displayLarge: GoogleFonts.inter(textStyle: base.displayLarge),
+      displayMedium: GoogleFonts.inter(textStyle: base.displayMedium),
+      displaySmall: GoogleFonts.inter(textStyle: base.displaySmall),
+      headlineLarge: GoogleFonts.inter(textStyle: base.headlineLarge),
+      headlineMedium: GoogleFonts.inter(textStyle: base.headlineMedium),
+      headlineSmall: GoogleFonts.inter(textStyle: base.headlineSmall),
+      titleLarge: GoogleFonts.inter(textStyle: base.titleLarge),
+      titleMedium: GoogleFonts.inter(textStyle: base.titleMedium),
+      titleSmall: GoogleFonts.inter(textStyle: base.titleSmall),
+      bodyLarge: GoogleFonts.inter(textStyle: base.bodyLarge),
+      bodyMedium: GoogleFonts.inter(textStyle: base.bodyMedium),
+      bodySmall: GoogleFonts.inter(textStyle: base.bodySmall),
+      labelLarge: GoogleFonts.inter(textStyle: base.labelLarge),
+      labelMedium: GoogleFonts.inter(textStyle: base.labelMedium),
+      labelSmall: GoogleFonts.inter(textStyle: base.labelSmall),
+    ).apply(bodyColor: textColor, displayColor: textColor);
   }
 
   static ThemeData get lightTheme => buildTheme(
