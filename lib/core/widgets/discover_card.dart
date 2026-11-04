@@ -62,6 +62,10 @@ class _DiscoverCardState extends State<DiscoverCard> {
     };
   }
 
+  String _formatChapterNumber(double number) {
+    return number % 1 == 0 ? number.toInt().toString() : number.toString();
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -86,14 +90,21 @@ class _DiscoverCardState extends State<DiscoverCard> {
     Widget coverCard = AnimatedContainer(
       duration: const Duration(milliseconds: 200),
       curve: Curves.easeOutCubic,
+      transform: Matrix4.translationValues(0, _isHovered ? -3 : 0, 0),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(borderRadius),
+        border: Border.all(
+          color: isDark
+              ? Colors.white.withValues(alpha: _isHovered ? 0.2 : 0.08)
+              : Colors.black.withValues(alpha: _isHovered ? 0.12 : 0.06),
+          width: 1,
+        ),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(
               alpha: _isHovered
-                  ? (isDark ? 0.45 : 0.2)
-                  : (isDark ? 0.3 : 0.1),
+                  ? (isDark ? 0.5 : 0.25)
+                  : (isDark ? 0.35 : 0.12),
             ),
             blurRadius: _isHovered ? 16 : 8,
             offset: Offset(0, _isHovered ? 8 : 4),
@@ -128,12 +139,13 @@ class _DiscoverCardState extends State<DiscoverCard> {
                   gradient: LinearGradient(
                     begin: Alignment.topCenter,
                     end: Alignment.bottomCenter,
-                    stops: const [0.0, 0.25, 0.65, 1.0],
+                    stops: const [0.0, 0.22, 0.45, 0.70, 1.0],
                     colors: [
-                      Colors.black.withValues(alpha: 0.55),
+                      Colors.black.withValues(alpha: 0.6),
                       Colors.transparent,
                       Colors.transparent,
-                      Colors.black.withValues(alpha: 0.8),
+                      Colors.black.withValues(alpha: 0.7),
+                      Colors.black.withValues(alpha: 0.95),
                     ],
                   ),
                 ),
@@ -147,7 +159,7 @@ class _DiscoverCardState extends State<DiscoverCard> {
               child: Container(
                 padding: const EdgeInsets.symmetric(
                   horizontal: 7,
-                  vertical: 3,
+                  vertical: 3.5,
                 ),
                 decoration: BoxDecoration(
                   color: _getTypeColor(widget.type)
@@ -157,6 +169,7 @@ class _DiscoverCardState extends State<DiscoverCard> {
                     BoxShadow(
                       color: Colors.black.withValues(alpha: 0.3),
                       blurRadius: 4,
+                      offset: const Offset(0, 1),
                     ),
                   ],
                 ),
@@ -193,9 +206,9 @@ class _DiscoverCardState extends State<DiscoverCard> {
                         borderRadius: BorderRadius.circular(6),
                         boxShadow: [
                           BoxShadow(
-                            color:
-                                Colors.black.withValues(alpha: 0.3),
+                            color: Colors.black.withValues(alpha: 0.3),
                             blurRadius: 4,
+                            offset: const Offset(0, 1),
                           ),
                         ],
                       ),
@@ -221,6 +234,13 @@ class _DiscoverCardState extends State<DiscoverCard> {
                         color: Colors.white.withValues(alpha: 0.15),
                         width: 0.5,
                       ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.3),
+                          blurRadius: 4,
+                          offset: const Offset(0, 1),
+                        ),
+                      ],
                     ),
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
@@ -249,77 +269,134 @@ class _DiscoverCardState extends State<DiscoverCard> {
               ),
             ),
 
-            // Bottom Badges: Latest Chapter & Views
+            // Bottom Content: Genres (if present), Title placed on top of Latest Chapter & Views
             Positioned(
               bottom: 8,
               left: 8,
               right: 8,
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
                 children: [
-                  Flexible(
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 7,
-                        vertical: 3,
-                      ),
-                      decoration: BoxDecoration(
-                        color: colorScheme.primary
-                            .withValues(alpha: 0.95),
-                        borderRadius: BorderRadius.circular(6),
-                        boxShadow: [
-                          BoxShadow(
-                            color:
-                                Colors.black.withValues(alpha: 0.3),
-                            blurRadius: 4,
+                  if (widget.genres.isNotEmpty) ...[
+                    Text(
+                      widget.genres.take(2).join(' • '),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: GoogleFonts.inter(
+                        fontSize: genreFontSize,
+                        color: Colors.white70,
+                        fontWeight: FontWeight.w500,
+                        letterSpacing: 0.2,
+                        shadows: const [
+                          Shadow(
+                            color: Colors.black87,
+                            blurRadius: 3,
                           ),
                         ],
                       ),
-                      child: Text(
-                        'Ch. ${widget.latestChapter?.number.toInt() ?? 0}',
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: GoogleFonts.inter(
-                          color: Colors.white,
-                          fontSize: badgeFontSize + 0.5,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
                     ),
-                  ),
-                  const SizedBox(width: 6),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 6,
-                      vertical: 3,
-                    ),
-                    decoration: BoxDecoration(
-                      color: Colors.black.withValues(alpha: 0.75),
-                      borderRadius: BorderRadius.circular(6),
-                      border: Border.all(
-                        color: Colors.white.withValues(alpha: 0.15),
-                        width: 0.5,
-                      ),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(
-                          Icons.visibility_outlined,
-                          color: Colors.white70,
-                          size: iconSize,
-                        ),
-                        const SizedBox(width: 3),
-                        Text(
-                          widget.views,
-                          style: GoogleFonts.inter(
-                            color: Colors.white,
-                            fontSize: badgeFontSize,
-                            fontWeight: FontWeight.w500,
-                          ),
+                    const SizedBox(height: 3),
+                  ],
+                  // Title placed on top of latest chapter & views
+                  Text(
+                    widget.title,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: GoogleFonts.inter(
+                      fontSize: titleFontSize,
+                      fontWeight: FontWeight.w700,
+                      color: Colors.white,
+                      height: 1.25,
+                      letterSpacing: 0.1,
+                      shadows: const [
+                        Shadow(
+                          color: Colors.black,
+                          offset: Offset(0, 1),
+                          blurRadius: 4,
                         ),
                       ],
                     ),
+                  ),
+                  const SizedBox(height: 6),
+                  // Latest Chapter & Views Badges
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Flexible(
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 7,
+                            vertical: 3.5,
+                          ),
+                          decoration: BoxDecoration(
+                            color: colorScheme.primary
+                                .withValues(alpha: 0.95),
+                            borderRadius: BorderRadius.circular(6),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withValues(alpha: 0.35),
+                                blurRadius: 4,
+                                offset: const Offset(0, 1),
+                              ),
+                            ],
+                          ),
+                          child: Text(
+                            widget.latestChapter != null
+                                ? 'Ch. ${_formatChapterNumber(widget.latestChapter!.number)}'
+                                : 'Ch. -',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: GoogleFonts.inter(
+                              color: Colors.white,
+                              fontSize: badgeFontSize + 0.5,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 6,
+                          vertical: 3.5,
+                        ),
+                        decoration: BoxDecoration(
+                          color: Colors.black.withValues(alpha: 0.75),
+                          borderRadius: BorderRadius.circular(6),
+                          border: Border.all(
+                            color: Colors.white.withValues(alpha: 0.15),
+                            width: 0.5,
+                          ),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withValues(alpha: 0.35),
+                              blurRadius: 4,
+                              offset: const Offset(0, 1),
+                            ),
+                          ],
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              Icons.visibility_outlined,
+                              color: Colors.white70,
+                              size: iconSize,
+                            ),
+                            const SizedBox(width: 3),
+                            Text(
+                              widget.views,
+                              style: GoogleFonts.inter(
+                                color: Colors.white,
+                                fontSize: badgeFontSize,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),
@@ -360,42 +437,9 @@ class _DiscoverCardState extends State<DiscoverCard> {
         child: InkWell(
           onTap: widget.onTap,
           borderRadius: BorderRadius.circular(borderRadius),
-          splashColor: colorScheme.primary.withValues(alpha: 0.1),
+          splashColor: colorScheme.primary.withValues(alpha: 0.12),
           highlightColor: colorScheme.primary.withValues(alpha: 0.05),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Cover Image with Badges & Vignette
-              Expanded(child: coverCard),
-
-              // Title and Genres Information
-              const SizedBox(height: 8),
-              Text(
-                widget.title,
-                style: GoogleFonts.inter(
-                  fontSize: titleFontSize,
-                  fontWeight: FontWeight.w700,
-                  color: isDark ? Colors.white : const Color(0xFF0F172A),
-                  height: 1.25,
-                ),
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-              ),
-              if (widget.genres.isNotEmpty) ...[
-                const SizedBox(height: 3),
-                Text(
-                  widget.genres.join(' • '),
-                  style: GoogleFonts.inter(
-                    fontSize: genreFontSize,
-                    color: isDark ? Colors.white60 : Colors.black54,
-                    fontWeight: FontWeight.w500,
-                  ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ],
-            ],
-          ),
+          child: coverCard,
         ),
       ),
     );
