@@ -337,6 +337,8 @@ class _HomeScreenState extends State<HomeScreen>
                               summary: summary,
                               heroTag: 'manga-cover-recommended-$id',
                             ),
+                        onNavigateToDiscover: () =>
+                            _navigateToDiscover(sortBy: 'popularity'),
                       ),
                     ),
                   ),
