@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/di/injection.dart';
 import '../../../../core/network/manga_api_service.dart';
+import '../../../../core/services/haptic_service.dart';
 import '../../models/query_paged_manga_request.dart';
 
 class FilterDialog extends StatefulWidget {
@@ -42,6 +43,7 @@ class _FilterDialogState extends State<FilterDialog> {
   late List<String> _selectedTypes;
   late List<String> _selectedStatuses;
   late TextEditingController _authorController;
+  final TextEditingController _genreSearchController = TextEditingController();
   double? _minRating;
   int? _minChapters;
   bool? _nsfw; // null = all, false = safe only, true = nsfw only
@@ -60,6 +62,8 @@ class _FilterDialogState extends State<FilterDialog> {
     _selectedStatuses = List.from(widget.initialFilter.statuses);
     _authorController =
         TextEditingController(text: widget.initialFilter.author ?? '');
+    _authorController.addListener(_onAuthorChanged);
+    _genreSearchController.addListener(() => setState(() {}));
     _minRating = widget.initialFilter.minRating;
     _minChapters = widget.initialFilter.minChapters;
     _nsfw = widget.initialFilter.nsfw ?? false;
@@ -70,9 +74,15 @@ class _FilterDialogState extends State<FilterDialog> {
     _fetchFilterData();
   }
 
+  void _onAuthorChanged() {
+    setState(() {});
+  }
+
   @override
   void dispose() {
+    _authorController.removeListener(_onAuthorChanged);
     _authorController.dispose();
+    _genreSearchController.dispose();
     super.dispose();
   }
 
@@ -101,6 +111,7 @@ class _FilterDialogState extends State<FilterDialog> {
   }
 
   void _resetAll() {
+    AppHaptics.mediumImpact();
     setState(() {
       _includedGenres.clear();
       _excludedGenres.clear();
@@ -108,6 +119,7 @@ class _FilterDialogState extends State<FilterDialog> {
       _selectedTypes.clear();
       _selectedStatuses.clear();
       _authorController.clear();
+      _genreSearchController.clear();
       _minRating = null;
       _minChapters = null;
       _nsfw = false;
@@ -187,33 +199,55 @@ class _FilterDialogState extends State<FilterDialog> {
                         letterSpacing: -0.5,
                       ),
                     ),
-                    if (activeCount > 0) ...[
-                      const SizedBox(width: 8),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 8, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: AppColors.primary,
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                        child: Text(
-                          '$activeCount',
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 12,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                    ],
+                    AnimatedSwitcher(
+                      duration: const Duration(milliseconds: 200),
+                      transitionBuilder: (child, animation) =>
+                          ScaleTransition(scale: animation, child: child),
+                      child: activeCount > 0
+                          ? Container(
+                              key: ValueKey<int>(activeCount),
+                              margin: const EdgeInsets.only(left: 8),
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 8, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: AppColors.primary,
+                                borderRadius: BorderRadius.circular(10),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: AppColors.primary.withValues(alpha: 0.3),
+                                    blurRadius: 6,
+                                    offset: const Offset(0, 2),
+                                  ),
+                                ],
+                              ),
+                              child: Text(
+                                '$activeCount',
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            )
+                          : const SizedBox.shrink(key: ValueKey<int>(0)),
+                    ),
                   ],
                 ),
-                TextButton(
-                  onPressed: _resetAll,
-                  child: Text(
+                TextButton.icon(
+                  onPressed: activeCount > 0 ? _resetAll : null,
+                  icon: Icon(
+                    Icons.restart_alt_rounded,
+                    size: 16,
+                    color: activeCount > 0
+                        ? AppColors.primary
+                        : (isDark ? Colors.white24 : Colors.grey[400]),
+                  ),
+                  label: Text(
                     'Reset All',
                     style: TextStyle(
-                      color: AppColors.primary,
+                      color: activeCount > 0
+                          ? AppColors.primary
+                          : (isDark ? Colors.white24 : Colors.grey[400]),
                       fontWeight: FontWeight.bold,
                     ),
                   ),
@@ -320,6 +354,15 @@ class _FilterDialogState extends State<FilterDialog> {
                         fontSize: 14,
                       ),
                       prefixIcon: const Icon(Icons.edit_outlined, size: 20),
+                      suffixIcon: _authorController.text.isNotEmpty
+                          ? IconButton(
+                              icon: const Icon(Icons.clear_rounded, size: 18),
+                              onPressed: () {
+                                AppHaptics.selection();
+                                _authorController.clear();
+                              },
+                            )
+                          : null,
                       filled: true,
                       fillColor: isDark
                           ? AppColors.cardDark
@@ -360,8 +403,9 @@ class _FilterDialogState extends State<FilterDialog> {
             child: SizedBox(
               width: double.infinity,
               height: 54,
-              child: ElevatedButton(
+              child: ElevatedButton.icon(
                 onPressed: () {
+                  AppHaptics.success();
                   final filter = widget.initialFilter.copyWith(
                     includedGenres: _includedGenres,
                     excludedGenres: _excludedGenres,
@@ -388,6 +432,22 @@ class _FilterDialogState extends State<FilterDialog> {
                   widget.onApply(filter, sort);
                   Navigator.pop(context);
                 },
+                icon: const Icon(Icons.tune_rounded, size: 20),
+                label: AnimatedSwitcher(
+                  duration: const Duration(milliseconds: 200),
+                  transitionBuilder: (child, animation) =>
+                      ScaleTransition(scale: animation, child: child),
+                  child: Text(
+                    activeCount > 0
+                        ? 'Apply Filters ($activeCount)'
+                        : 'Apply Filters',
+                    key: ValueKey<int>(activeCount),
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppColors.primary,
                   foregroundColor: Colors.white,
@@ -396,13 +456,6 @@ class _FilterDialogState extends State<FilterDialog> {
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(16),
                   ),
-                ),
-                child: Text(
-                  activeCount > 0
-                      ? 'Apply Filters ($activeCount)'
-                      : 'Apply Filters',
-                  style: const TextStyle(
-                      fontSize: 16, fontWeight: FontWeight.bold),
                 ),
               ),
             ),
@@ -416,6 +469,7 @@ class _FilterDialogState extends State<FilterDialog> {
     required String title,
     required IconData icon,
     String? subtitle,
+    Widget? trailing,
   }) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 12.0),
@@ -438,48 +492,175 @@ class _FilterDialogState extends State<FilterDialog> {
               style: TextStyle(fontSize: 12, color: Colors.grey[500]),
             ),
           ],
+          if (trailing != null) ...[
+            const Spacer(),
+            trailing,
+          ],
         ],
       ),
     );
   }
 
   Widget _buildGenresSection(bool isDark) {
+    final query = _genreSearchController.text.trim().toLowerCase();
+    final displayedGenres = query.isEmpty
+        ? _genres
+        : _genres.where((g) => g.toLowerCase().contains(query)).toList();
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            _buildSectionHeader(
-              title: 'Genres',
-              icon: Icons.local_offer_outlined,
-            ),
-            // AND / OR match mode toggle
-            Container(
-              decoration: BoxDecoration(
-                color: isDark
-                    ? AppColors.cardDark
-                    : Colors.grey.withValues(alpha: 0.12),
-                borderRadius: BorderRadius.circular(20),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  _buildMiniSegment(
-                    label: 'AND',
-                    isSelected: _genreMatchMode == 'and',
-                    onTap: () => setState(() => _genreMatchMode = 'and'),
-                  ),
-                  _buildMiniSegment(
-                    label: 'OR',
-                    isSelected: _genreMatchMode == 'or',
-                    onTap: () => setState(() => _genreMatchMode = 'or'),
-                  ),
+            Row(
+              children: [
+                _buildSectionHeader(
+                  title: 'Genres',
+                  icon: Icons.local_offer_outlined,
+                ),
+                if (_includedGenres.isNotEmpty || _excludedGenres.isNotEmpty) ...[
+                  const SizedBox(width: 6),
+                  if (_includedGenres.isNotEmpty)
+                    Container(
+                      margin: const EdgeInsets.only(bottom: 12, right: 4),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 6, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF10B981).withValues(alpha: 0.15),
+                        borderRadius: BorderRadius.circular(6),
+                        border: Border.all(
+                            color: const Color(0xFF10B981), width: 0.8),
+                      ),
+                      child: Text(
+                        '+${_includedGenres.length}',
+                        style: const TextStyle(
+                          color: Color(0xFF10B981),
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  if (_excludedGenres.isNotEmpty)
+                    Container(
+                      margin: const EdgeInsets.only(bottom: 12, right: 4),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 6, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFEF4444).withValues(alpha: 0.15),
+                        borderRadius: BorderRadius.circular(6),
+                        border: Border.all(
+                            color: const Color(0xFFEF4444), width: 0.8),
+                      ),
+                      child: Text(
+                        '-${_excludedGenres.length}',
+                        style: const TextStyle(
+                          color: Color(0xFFEF4444),
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
                 ],
-              ),
+              ],
+            ),
+            Row(
+              children: [
+                if (_includedGenres.isNotEmpty || _excludedGenres.isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 12.0, right: 8.0),
+                    child: GestureDetector(
+                      onTap: () {
+                        AppHaptics.selection();
+                        setState(() {
+                          _includedGenres.clear();
+                          _excludedGenres.clear();
+                        });
+                      },
+                      child: Text(
+                        'Clear',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Colors.grey[500],
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ),
+                // AND / OR match mode toggle
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 12.0),
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: isDark
+                          ? AppColors.cardDark
+                          : Colors.grey.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        _buildMiniSegment(
+                          label: 'AND',
+                          isSelected: _genreMatchMode == 'and',
+                          onTap: () {
+                            AppHaptics.selection();
+                            setState(() => _genreMatchMode = 'and');
+                          },
+                        ),
+                        _buildMiniSegment(
+                          label: 'OR',
+                          isSelected: _genreMatchMode == 'or',
+                          onTap: () {
+                            AppHaptics.selection();
+                            setState(() => _genreMatchMode = 'or');
+                          },
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
             ),
           ],
         ),
+
+        // Search genres input
+        Container(
+          margin: const EdgeInsets.only(bottom: 12),
+          child: TextField(
+            controller: _genreSearchController,
+            decoration: InputDecoration(
+              hintText: 'Search genres...',
+              hintStyle: TextStyle(
+                color: isDark ? Colors.white38 : Colors.grey,
+                fontSize: 13,
+              ),
+              prefixIcon: const Icon(Icons.search_rounded, size: 18),
+              suffixIcon: _genreSearchController.text.isNotEmpty
+                  ? IconButton(
+                      icon: const Icon(Icons.close_rounded, size: 16),
+                      onPressed: () {
+                        AppHaptics.selection();
+                        _genreSearchController.clear();
+                      },
+                    )
+                  : null,
+              filled: true,
+              fillColor: isDark
+                  ? AppColors.cardDark
+                  : Colors.grey.withValues(alpha: 0.08),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide.none,
+              ),
+              contentPadding:
+                  const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+              isDense: true,
+            ),
+          ),
+        ),
+
         // Legend banner
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
@@ -507,85 +688,123 @@ class _FilterDialogState extends State<FilterDialog> {
             ],
           ),
         ),
-        Wrap(
-          spacing: 8,
-          runSpacing: 8,
-          children: _genres.map((genre) {
-            final isIncluded = _includedGenres.contains(genre);
-            final isExcluded = _excludedGenres.contains(genre);
 
-            Color chipBorderColor;
-            Color chipBgColor;
-            Color textColor;
-            IconData? chipIcon;
-
-            if (isIncluded) {
-              chipBorderColor = const Color(0xFF10B981);
-              chipBgColor = const Color(0xFF10B981).withValues(alpha: 0.15);
-              textColor = const Color(0xFF10B981);
-              chipIcon = Icons.check_rounded;
-            } else if (isExcluded) {
-              chipBorderColor = const Color(0xFFEF4444);
-              chipBgColor = const Color(0xFFEF4444).withValues(alpha: 0.15);
-              textColor = const Color(0xFFEF4444);
-              chipIcon = Icons.close_rounded;
-            } else {
-              chipBorderColor = isDark
-                  ? Colors.white12
-                  : Colors.grey.withValues(alpha: 0.25);
-              chipBgColor = Colors.transparent;
-              textColor = isDark ? Colors.white70 : Colors.grey[700]!;
-              chipIcon = null;
-            }
-
-            return GestureDetector(
-              onTap: () {
-                setState(() {
-                  if (isIncluded) {
-                    // Switch from Include -> Exclude
-                    _includedGenres.remove(genre);
-                    _excludedGenres.add(genre);
-                  } else if (isExcluded) {
-                    // Switch from Exclude -> Neutral
-                    _excludedGenres.remove(genre);
-                  } else {
-                    // Switch from Neutral -> Include
-                    _includedGenres.add(genre);
-                  }
-                });
-              },
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 150),
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                decoration: BoxDecoration(
-                  color: chipBgColor,
-                  border: Border.all(color: chipBorderColor, width: 1.2),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    if (chipIcon != null) ...[
-                      Icon(chipIcon, size: 14, color: textColor),
-                      const SizedBox(width: 6),
-                    ],
-                    Text(
-                      genre,
-                      style: TextStyle(
-                        color: textColor,
-                        fontSize: 13,
-                        fontWeight: isIncluded || isExcluded
-                            ? FontWeight.bold
-                            : FontWeight.w500,
-                      ),
-                    ),
-                  ],
+        if (displayedGenres.isEmpty)
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 16),
+            child: Center(
+              child: Text(
+                'No genres matching "${_genreSearchController.text}"',
+                style: TextStyle(
+                  fontSize: 13,
+                  color: isDark ? Colors.white38 : Colors.grey[500],
                 ),
               ),
-            );
-          }).toList(),
-        ),
+            ),
+          )
+        else
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: displayedGenres.map((genre) {
+              final isIncluded = _includedGenres.contains(genre);
+              final isExcluded = _excludedGenres.contains(genre);
+
+              Color chipBorderColor;
+              Color chipBgColor;
+              Color textColor;
+              IconData? chipIcon;
+
+              if (isIncluded) {
+                chipBorderColor = const Color(0xFF10B981);
+                chipBgColor = const Color(0xFF10B981).withValues(alpha: 0.15);
+                textColor = const Color(0xFF10B981);
+                chipIcon = Icons.check_rounded;
+              } else if (isExcluded) {
+                chipBorderColor = const Color(0xFFEF4444);
+                chipBgColor = const Color(0xFFEF4444).withValues(alpha: 0.15);
+                textColor = const Color(0xFFEF4444);
+                chipIcon = Icons.close_rounded;
+              } else {
+                chipBorderColor = isDark
+                    ? Colors.white12
+                    : Colors.grey.withValues(alpha: 0.25);
+                chipBgColor = Colors.transparent;
+                textColor = isDark ? Colors.white70 : Colors.grey[700]!;
+                chipIcon = null;
+              }
+
+              return _InteractiveChip(
+                isSelected: isIncluded || isExcluded,
+                onTap: () {
+                  setState(() {
+                    if (isIncluded) {
+                      // Switch from Include -> Exclude
+                      _includedGenres.remove(genre);
+                      _excludedGenres.add(genre);
+                      AppHaptics.warning();
+                    } else if (isExcluded) {
+                      // Switch from Exclude -> Neutral
+                      _excludedGenres.remove(genre);
+                      AppHaptics.selection();
+                    } else {
+                      // Switch from Neutral -> Include
+                      _includedGenres.add(genre);
+                      AppHaptics.lightImpact();
+                    }
+                  });
+                },
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 150),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: chipBgColor,
+                    border: Border.all(color: chipBorderColor, width: 1.2),
+                    borderRadius: BorderRadius.circular(12),
+                    boxShadow: isIncluded
+                        ? [
+                            BoxShadow(
+                              color: const Color(0xFF10B981)
+                                  .withValues(alpha: 0.25),
+                              blurRadius: 8,
+                              offset: const Offset(0, 2),
+                            ),
+                          ]
+                        : isExcluded
+                            ? [
+                                BoxShadow(
+                                  color: const Color(0xFFEF4444)
+                                      .withValues(alpha: 0.25),
+                                  blurRadius: 8,
+                                  offset: const Offset(0, 2),
+                                ),
+                              ]
+                            : null,
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (chipIcon != null) ...[
+                        Icon(chipIcon, size: 14, color: textColor),
+                        const SizedBox(width: 6),
+                      ],
+                      Text(
+                        genre,
+                        style: TextStyle(
+                          color: textColor,
+                          fontSize: 13,
+                          fontWeight: isIncluded || isExcluded
+                              ? FontWeight.bold
+                              : FontWeight.w500,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            }).toList(),
+          ),
       ],
     );
   }
@@ -595,13 +814,24 @@ class _FilterDialogState extends State<FilterDialog> {
     required bool isSelected,
     required VoidCallback onTap,
   }) {
-    return GestureDetector(
+    return _InteractiveChip(
+      isSelected: isSelected,
       onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 160),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
         decoration: BoxDecoration(
           color: isSelected ? AppColors.primary : Colors.transparent,
           borderRadius: BorderRadius.circular(16),
+          boxShadow: isSelected
+              ? [
+                  BoxShadow(
+                    color: AppColors.primary.withValues(alpha: 0.3),
+                    blurRadius: 6,
+                    offset: const Offset(0, 1),
+                  ),
+                ]
+              : null,
         ),
         child: Text(
           label,
@@ -666,7 +896,7 @@ class _FilterDialogState extends State<FilterDialog> {
       children: [
         Expanded(
           child: _buildOptionChip(
-            label: 'Descending (Z-A / High-Low)',
+            label: 'Descending (High-Low)',
             isSelected: _selectedOrderBy == 'desc',
             onTap: () => setState(() => _selectedOrderBy = 'desc'),
             icon: Icons.arrow_downward_rounded,
@@ -675,7 +905,7 @@ class _FilterDialogState extends State<FilterDialog> {
         const SizedBox(width: 8),
         Expanded(
           child: _buildOptionChip(
-            label: 'Ascending (A-Z / Low-High)',
+            label: 'Ascending (Low-High)',
             isSelected: _selectedOrderBy == 'asc',
             onTap: () => setState(() => _selectedOrderBy = 'asc'),
             icon: Icons.arrow_upward_rounded,
@@ -694,9 +924,19 @@ class _FilterDialogState extends State<FilterDialog> {
       children: ratingOptions.map((rating) {
         final isSelected = _minRating == rating;
         return _buildOptionChip(
-          label: rating == null ? 'Any Rating' : '⭐ ${rating.toStringAsFixed(1)}+',
+          label: rating == null ? 'Any Rating' : '${rating.toStringAsFixed(1)}+',
           isSelected: isSelected,
           onTap: () => setState(() => _minRating = rating),
+          customIcon: rating != null
+              ? Icon(
+                  Icons.star_rounded,
+                  size: 16,
+                  color: isSelected
+                      ? const Color(0xFFF59E0B)
+                      : Colors.amber.withValues(alpha: 0.6),
+                )
+              : null,
+          activeColor: const Color(0xFFF59E0B),
         );
       }).toList(),
     );
@@ -711,9 +951,10 @@ class _FilterDialogState extends State<FilterDialog> {
       children: chapterOptions.map((chapters) {
         final isSelected = _minChapters == chapters;
         return _buildOptionChip(
-          label: chapters == null ? 'Any Length' : '$chapters+ Chapters',
+          label: chapters == null ? 'Any Length' : '$chapters+ Ch.',
           isSelected: isSelected,
           onTap: () => setState(() => _minChapters = chapters),
+          icon: chapters != null ? Icons.menu_book_rounded : null,
         );
       }).toList(),
     );
@@ -724,7 +965,7 @@ class _FilterDialogState extends State<FilterDialog> {
       children: [
         Expanded(
           child: _buildOptionChip(
-            label: 'All Content',
+            label: 'All',
             isSelected: _nsfw == null,
             onTap: () => setState(() => _nsfw = null),
           ),
@@ -736,6 +977,7 @@ class _FilterDialogState extends State<FilterDialog> {
             isSelected: _nsfw == false,
             onTap: () => setState(() => _nsfw = false),
             icon: Icons.check_circle_outline_rounded,
+            activeColor: const Color(0xFF10B981),
           ),
         ),
         const SizedBox(width: 8),
@@ -745,6 +987,7 @@ class _FilterDialogState extends State<FilterDialog> {
             isSelected: _nsfw == true,
             onTap: () => setState(() => _nsfw = true),
             icon: Icons.warning_amber_rounded,
+            activeColor: const Color(0xFFEF4444),
           ),
         ),
       ],
@@ -756,36 +999,56 @@ class _FilterDialogState extends State<FilterDialog> {
     required bool isSelected,
     required VoidCallback onTap,
     IconData? icon,
+    Widget? customIcon,
+    Color? activeColor,
   }) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final primaryColor = activeColor ?? AppColors.primary;
 
-    return GestureDetector(
-      onTap: onTap,
+    return _InteractiveChip(
+      isSelected: isSelected,
+      onTap: () {
+        AppHaptics.selection();
+        onTap();
+      },
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 180),
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
         decoration: BoxDecoration(
           color: isSelected
-              ? AppColors.primary.withValues(alpha: 0.15)
+              ? primaryColor.withValues(alpha: 0.15)
               : (isDark ? AppColors.cardDark : Colors.transparent),
           border: Border.all(
             color: isSelected
-                ? AppColors.primary
+                ? primaryColor
                 : (isDark ? Colors.white12 : Colors.grey.withValues(alpha: 0.25)),
-            width: isSelected ? 1.4 : 1.0,
+            width: isSelected ? 1.5 : 1.0,
           ),
           borderRadius: BorderRadius.circular(14),
+          boxShadow: isSelected
+              ? [
+                  BoxShadow(
+                    color: primaryColor.withValues(alpha: 0.25),
+                    blurRadius: 8,
+                    spreadRadius: 0,
+                    offset: const Offset(0, 2),
+                  ),
+                ]
+              : null,
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            if (icon != null) ...[
+            if (customIcon != null) ...[
+              customIcon,
+              const SizedBox(width: 6),
+            ] else if (icon != null) ...[
               Icon(
                 icon,
                 size: 15,
                 color: isSelected
-                    ? AppColors.primary
+                    ? primaryColor
                     : (isDark ? Colors.white60 : Colors.grey[600]),
               ),
               const SizedBox(width: 6),
@@ -796,7 +1059,7 @@ class _FilterDialogState extends State<FilterDialog> {
                 overflow: TextOverflow.ellipsis,
                 style: TextStyle(
                   color: isSelected
-                      ? AppColors.primary
+                      ? primaryColor
                       : (isDark ? Colors.white70 : Colors.grey[700]),
                   fontSize: 13,
                   fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
@@ -805,6 +1068,43 @@ class _FilterDialogState extends State<FilterDialog> {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+/// Interactive pressable wrapper with spring scale feedback on touch down/up.
+class _InteractiveChip extends StatefulWidget {
+  final Widget child;
+  final VoidCallback onTap;
+  final bool isSelected;
+
+  const _InteractiveChip({
+    required this.child,
+    required this.onTap,
+    this.isSelected = false,
+  });
+
+  @override
+  State<_InteractiveChip> createState() => _InteractiveChipState();
+}
+
+class _InteractiveChipState extends State<_InteractiveChip> {
+  bool _isPressed = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTapDown: (_) => setState(() => _isPressed = true),
+      onTapUp: (_) => setState(() => _isPressed = false),
+      onTapCancel: () => setState(() => _isPressed = false),
+      onTap: widget.onTap,
+      behavior: HitTestBehavior.opaque,
+      child: AnimatedScale(
+        scale: _isPressed ? 0.93 : 1.0,
+        duration: const Duration(milliseconds: 100),
+        curve: Curves.easeInOut,
+        child: widget.child,
       ),
     );
   }
