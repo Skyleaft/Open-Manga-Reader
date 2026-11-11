@@ -6,6 +6,7 @@ import 'package:flutter/scheduler.dart';
 import 'package:flutter/services.dart';
 
 import '../../../core/constants/app_colors.dart';
+import '../../../core/services/haptic_service.dart';
 import '../../../core/widgets/alert_banner.dart';
 import '../../manga_detail/models/manga_detail.dart';
 import '../controllers/reader_controller.dart';
@@ -349,12 +350,12 @@ class _ReaderScreenState extends State<ReaderScreen>
         if (!_isPullToNextArmed) {
           _isPullToNextArmed = true;
           if (isInteractive) {
-            HapticFeedback.mediumImpact();
+            AppHaptics.gestureThresholdActivate();
           }
         }
       } else {
         if (isInteractive) {
-          HapticFeedback.selectionClick();
+          AppHaptics.segmentTick();
         }
       }
       _lastOverscrollMilestone = currentMilestone;
@@ -362,7 +363,7 @@ class _ReaderScreenState extends State<ReaderScreen>
       if (_isPullToNextArmed && currentMilestone < 4) {
         _isPullToNextArmed = false;
         if (isInteractive) {
-          HapticFeedback.selectionClick();
+          AppHaptics.gestureThresholdDeactivate();
         }
       }
       _lastOverscrollMilestone = currentMilestone;
@@ -379,12 +380,12 @@ class _ReaderScreenState extends State<ReaderScreen>
     if (_controller.isLoading || _controller.isChangingChapter) return;
     _overscrollResetTimer?.cancel();
     _resetPullToNextOverscroll();
-    HapticFeedback.mediumImpact();
+    AppHaptics.success();
     _changeChapter(true);
   }
 
   void _changeChapter(bool next) {
-    HapticFeedback.mediumImpact();
+    AppHaptics.mediumImpact();
     _controller.changeChapter(
       next: next,
       onChapterNotFound: () {
@@ -443,7 +444,7 @@ class _ReaderScreenState extends State<ReaderScreen>
   }
 
   void _loadChapter(Chapter targetChapter, {int initialPage = 1}) {
-    HapticFeedback.mediumImpact();
+    AppHaptics.mediumImpact();
     _controller.loadChapter(
       targetChapter,
       initialPage: initialPage,
@@ -761,6 +762,7 @@ class _ReaderScreenState extends State<ReaderScreen>
     }
 
     final page = index + 1;
+    AppHaptics.pageTurn();
     final progress =
         (index / (_controller.pageUrls.length - 1)).clamp(0.0, 1.0);
     _controller.updatePageAndProgress(page, progress);
@@ -1255,7 +1257,7 @@ class _ReaderScreenState extends State<ReaderScreen>
                             if (hasNextChapter &&
                                 !_controller.isLoading &&
                                 !_controller.isChangingChapter) {
-                              HapticFeedback.mediumImpact();
+                              AppHaptics.mediumImpact();
                               _triggerPullToNextChapter();
                             }
                           },

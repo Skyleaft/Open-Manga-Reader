@@ -2,6 +2,7 @@ import 'package:get_it/get_it.dart';
 import '../config/app_config.dart';
 import '../network/manga_api_service.dart';
 import '../network/sync_service.dart';
+import '../services/haptic_service.dart';
 import '../services/heartbeat_service.dart';
 import '../services/notification_service.dart';
 import '../services/window_service.dart';
@@ -20,6 +21,7 @@ final getIt = GetIt.instance;
 
 Future<void> setupInjection() async {
   await AppConfig.init();
+  await AppHaptics.init();
   final themeProvider = ThemeProvider();
   await themeProvider.init();
   getIt.registerSingleton<ThemeProvider>(themeProvider);

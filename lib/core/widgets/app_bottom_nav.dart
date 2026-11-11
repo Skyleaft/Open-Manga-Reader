@@ -1,9 +1,9 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:animated_icon/animated_icon.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../constants/app_colors.dart';
+import '../services/haptic_service.dart';
 
 class AppBottomNav extends StatelessWidget {
   final int currentIndex;
@@ -140,7 +140,7 @@ class AppBottomNav extends StatelessWidget {
 
     return InkWell(
       onTap: () {
-        HapticFeedback.selectionClick();
+        AppHaptics.selection();
         onTap(index);
       },
       borderRadius: BorderRadius.circular(24),
@@ -175,7 +175,7 @@ class AppBottomNav extends StatelessWidget {
               child: AnimateIcon(
                 key: ValueKey('nav_item_$index'),
                 onTap: () {
-                  HapticFeedback.selectionClick();
+                  AppHaptics.selection();
                   onTap(index);
                 },
                 iconType: IconType.animatedOnTap,

@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import '../../../../core/constants/app_colors.dart';
+import '../../../../core/services/haptic_service.dart';
 
 class StatsSheetHelpers {
   static Widget buildHandle(bool isDark) {
@@ -78,7 +78,7 @@ class StatsSheetHelpers {
   }) {
     return InkWell(
       onTap: () {
-        HapticFeedback.selectionClick();
+        AppHaptics.selection();
         onTap();
       },
       borderRadius: BorderRadius.circular(20),

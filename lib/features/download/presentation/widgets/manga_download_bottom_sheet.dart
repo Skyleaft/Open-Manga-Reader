@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/di/injection.dart';
+import '../../../../core/services/haptic_service.dart';
 import '../../../../core/widgets/alert_banner.dart';
 import '../../../history/models/progression.dart';
 import '../../../manga_detail/models/manga_detail.dart';
@@ -276,7 +276,7 @@ class _MangaDownloadBottomSheetState extends State<MangaDownloadBottomSheet> {
                       onChanged: isDownloaded
                           ? null
                           : (val) {
-                              HapticFeedback.selectionClick();
+                              AppHaptics.toggle(val == true);
                               setState(() {
                                 if (val == true) {
                                   _selectedChapterIds.add(chapter.id);
@@ -379,6 +379,7 @@ class _MangaDownloadBottomSheetState extends State<MangaDownloadBottomSheet> {
   void _startDownload(BuildContext context, List<Chapter> chapters) {
     if (chapters.isEmpty) return;
 
+    AppHaptics.success();
     final downloadService = getIt<DownloadService>();
     downloadService.downloadChapters(widget.manga, chapters);
 
@@ -403,7 +404,7 @@ class _MangaDownloadBottomSheetState extends State<MangaDownloadBottomSheet> {
       enabled: enabled,
       onTap: enabled
           ? () {
-              HapticFeedback.selectionClick();
+              AppHaptics.selection();
               onTap();
             }
           : null,

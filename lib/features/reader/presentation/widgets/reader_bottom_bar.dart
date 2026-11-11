@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'dart:ui';
 import '../../../../core/constants/app_colors.dart';
+import '../../../../core/services/haptic_service.dart';
 
 class ReaderBottomBar extends StatelessWidget {
   final double progress;
@@ -119,7 +119,7 @@ class ReaderBottomBar extends StatelessWidget {
       child: IconButton(
         icon: Icon(icon, color: Colors.white, size: 20),
         onPressed: () {
-          HapticFeedback.lightImpact();
+          AppHaptics.lightImpact();
           onTap();
         },
         tooltip: tooltip,
@@ -253,7 +253,7 @@ class _SegmentedProgressBarState extends State<_SegmentedProgressBar> {
     _isDragging = true;
     _lastHapticPage = null;
     widget.onChangeStart(0);
-    HapticFeedback.lightImpact();
+    AppHaptics.dragStart();
     _handleGesture(localPosition, width);
   }
 
@@ -270,7 +270,7 @@ class _SegmentedProgressBarState extends State<_SegmentedProgressBar> {
 
     if (_lastHapticPage != targetPage) {
       _lastHapticPage = targetPage;
-      HapticFeedback.selectionClick();
+      AppHaptics.segmentFrequentTick();
     }
 
     setState(() {
@@ -283,7 +283,7 @@ class _SegmentedProgressBarState extends State<_SegmentedProgressBar> {
 
   void _endGesture() {
     if (_isDragging) {
-      HapticFeedback.lightImpact();
+      AppHaptics.gestureEnd();
     }
     setState(() {
       _isDragging = false;

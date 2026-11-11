@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/di/injection.dart';
+import '../../../core/services/haptic_service.dart';
 import '../../../core/widgets/alert_banner.dart';
 import '../../../routes/app_pages.dart';
 import '../services/storage_service.dart';
@@ -81,12 +81,13 @@ class _StorageSettingScreenState extends State<StorageSettingScreen> {
 
     if (confirmed == true && mounted) {
       setState(() => _isClearing = true);
-      HapticFeedback.mediumImpact();
+      AppHaptics.mediumImpact();
       await _storageService.clearCache();
       await Future.delayed(const Duration(milliseconds: 400));
       await _loadStorageUsage();
       if (mounted) {
         setState(() => _isClearing = false);
+        AppHaptics.success();
         AlertBanner.show(
           context,
           'Cache cleared successfully!',
@@ -97,7 +98,7 @@ class _StorageSettingScreenState extends State<StorageSettingScreen> {
   }
 
   Future<void> _openDownloadsManager() async {
-    HapticFeedback.selectionClick();
+    AppHaptics.selection();
     await Navigator.pushNamed(context, AppRoutes.downloadedChapters);
     if (mounted) {
       _loadStorageUsage();

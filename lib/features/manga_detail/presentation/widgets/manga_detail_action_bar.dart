@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
+import '../../../../core/services/haptic_service.dart';
 import '../../../history/models/progression.dart';
 import '../../models/manga_detail.dart';
 import 'status_selection_sheet.dart';
@@ -216,7 +216,7 @@ class MangaDetailActionBar extends StatelessWidget {
               : (isDark ? Colors.white70 : Colors.black54),
         ),
         onPressed: () async {
-          HapticFeedback.selectionClick();
+          AppHaptics.selection();
           if (isInLibrary) {
             _showLibraryOptionsSheet(context, isDark);
           } else {
@@ -368,7 +368,7 @@ class MangaDetailActionBar extends StatelessWidget {
               : (isDark ? Colors.white70 : Colors.black54),
         ),
         onPressed: () {
-          HapticFeedback.selectionClick();
+          AppHaptics.favorite(!isFavorite);
           onToggleFavorite();
         },
       ),

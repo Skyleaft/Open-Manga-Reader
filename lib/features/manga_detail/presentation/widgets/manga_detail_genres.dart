@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher_string.dart';
 import 'package:google_fonts/google_fonts.dart';
+import '../../../../core/services/haptic_service.dart';
 import '../../models/manga_detail.dart';
 
 class MangaDetailGenres extends StatefulWidget {
@@ -172,7 +172,7 @@ class _MangaDetailGenresState extends State<MangaDetailGenres> {
           if (hasOverflow)
             InkWell(
               onTap: () {
-                HapticFeedback.lightImpact();
+                AppHaptics.lightImpact();
                 setState(() => _isExpanded = !_isExpanded);
               },
               borderRadius: BorderRadius.circular(16),
