@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
+import '../../../../core/services/haptic_service.dart';
 import '../../controllers/manga_detail_controller.dart';
 
 class MangaDetailChapterHeader extends StatefulWidget {
@@ -137,7 +137,7 @@ class _MangaDetailChapterHeaderState extends State<MangaDetailChapterHeader> {
                 IconButton(
                   tooltip: 'Search Chapters',
                   onPressed: () {
-                    HapticFeedback.selectionClick();
+                    AppHaptics.selection();
                     setState(() => _isSearching = true);
                   },
                   icon: Icon(
@@ -149,7 +149,7 @@ class _MangaDetailChapterHeaderState extends State<MangaDetailChapterHeader> {
                 IconButton(
                   tooltip: 'Scrape Chapters Online',
                   onPressed: () {
-                    HapticFeedback.selectionClick();
+                    AppHaptics.selection();
                     widget.onScrapChapters();
                   },
                   icon: Icon(
@@ -162,7 +162,7 @@ class _MangaDetailChapterHeaderState extends State<MangaDetailChapterHeader> {
                   IconButton(
                     tooltip: 'Download Chapters',
                     onPressed: () {
-                      HapticFeedback.selectionClick();
+                      AppHaptics.selection();
                       widget.onDownloadChapters!();
                     },
                     icon: Icon(
@@ -175,7 +175,7 @@ class _MangaDetailChapterHeaderState extends State<MangaDetailChapterHeader> {
                   tooltip: 'Filter chapters',
                   initialValue: widget.currentFilter,
                   onSelected: (option) {
-                    HapticFeedback.selectionClick();
+                    AppHaptics.selection();
                     widget.onFilterChanged(option);
                   },
                   icon: Icon(
@@ -204,7 +204,7 @@ class _MangaDetailChapterHeaderState extends State<MangaDetailChapterHeader> {
                 ),
                 TextButton.icon(
                   onPressed: () {
-                    HapticFeedback.selectionClick();
+                    AppHaptics.selection();
                     widget.onToggleSort();
                   },
                   icon: Text(

@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/di/injection.dart';
 import '../../../core/network/manga_api_service.dart';
+import '../../../core/services/haptic_service.dart';
 import '../../../core/theme/theme_provider.dart';
 import '../../../core/widgets/alert_banner.dart';
 import '../../../core/widgets/shimmer_box.dart';
@@ -24,6 +24,7 @@ import 'storage_setting_screen.dart';
 import 'theme_setting_screen.dart';
 import 'widgets/app_update_dialog.dart';
 import 'widgets/chapters_read_sheet.dart';
+import 'widgets/haptic_settings_sheet.dart';
 import 'widgets/reading_stats_sheet.dart';
 import 'widgets/time_spent_sheet.dart';
 
@@ -272,7 +273,7 @@ class _MoreScreenState extends State<MoreScreen>
     }
     _lastVersionTapTime = now;
 
-    HapticFeedback.selectionClick();
+    AppHaptics.selection();
 
     if (_versionTapCount >= 5) {
       _versionTapCount = 0;
@@ -399,6 +400,19 @@ class _MoreScreenState extends State<MoreScreen>
                         builder: (context) => const ThemeSettingScreen(),
                       ),
                     );
+                  },
+                ),
+                _buildMenuItem(
+                  context,
+                  icon: Icons.vibration_rounded,
+                  title: 'Haptic Feedback',
+                  subtitle: AppHaptics.isEnabled
+                      ? 'Interactive touch vibrations enabled'
+                      : 'Haptics disabled',
+                  onTap: () async {
+                    AppHaptics.selection();
+                    await HapticSettingsBottomSheet.show(context);
+                    if (mounted) setState(() {});
                   },
                 ),
                 _buildMenuItem(
@@ -937,7 +951,7 @@ class _MoreScreenState extends State<MoreScreen>
   }) {
     return InkWell(
       onTap: () {
-        HapticFeedback.selectionClick();
+        AppHaptics.selection();
         onTap();
       },
       borderRadius: BorderRadius.circular(14),
@@ -1013,7 +1027,7 @@ class _MoreScreenState extends State<MoreScreen>
   }
 
   Future<void> _navigateToDetail(String mangaId) async {
-    HapticFeedback.selectionClick();
+    AppHaptics.selection();
     try {
       final detailService = getIt<MangaDetailService>();
       MangaDetail? detail = await detailService.getDetail(mangaId);
@@ -1040,7 +1054,7 @@ class _MoreScreenState extends State<MoreScreen>
   }
 
   void _showReadingStatsDialog() {
-    HapticFeedback.selectionClick();
+    AppHaptics.selection();
     ReadingStatsBottomSheet.show(
       context,
       progressions: _progressions,
@@ -1050,7 +1064,7 @@ class _MoreScreenState extends State<MoreScreen>
   }
 
   void _showTimeSpentDialog() {
-    HapticFeedback.selectionClick();
+    AppHaptics.selection();
     TimeSpentBottomSheet.show(
       context,
       progressions: _progressions,
@@ -1060,7 +1074,7 @@ class _MoreScreenState extends State<MoreScreen>
   }
 
   void _showChaptersReadDialog() {
-    HapticFeedback.selectionClick();
+    AppHaptics.selection();
     ChaptersReadBottomSheet.show(
       context,
       progressions: _progressions,
@@ -1111,10 +1125,11 @@ class _MoreScreenState extends State<MoreScreen>
     );
 
     if (confirmed == true && mounted) {
-      HapticFeedback.mediumImpact();
+      AppHaptics.mediumImpact();
       await _storageService.clearCache();
       await _loadCacheSize();
       if (mounted) {
+        AppHaptics.success();
         AlertBanner.show(
           context,
           'Cache cleared successfully!',
@@ -1125,7 +1140,7 @@ class _MoreScreenState extends State<MoreScreen>
   }
 
   Future<void> _openDownloadedChapters() async {
-    HapticFeedback.selectionClick();
+    AppHaptics.selection();
     if (!mounted) return;
     await Navigator.pushNamed(context, AppRoutes.downloadedChapters);
     if (mounted) {
@@ -1253,7 +1268,7 @@ class _MoreScreenState extends State<MoreScreen>
   Future<void> _handleLogout() async {
     if (_isLoggingOut) return;
 
-    HapticFeedback.mediumImpact();
+    AppHaptics.mediumImpact();
     setState(() {
       _isLoggingOut = true;
     });

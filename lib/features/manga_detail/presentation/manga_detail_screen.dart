@@ -5,6 +5,7 @@ import '../../../core/constants/app_colors.dart';
 import '../../../core/di/injection.dart';
 import '../../../core/network/manga_api_service.dart';
 import '../../../core/models/manga_summary.dart';
+import '../../../core/services/haptic_service.dart';
 import '../../../core/widgets/alert_banner.dart';
 import '../../../core/widgets/shimmer_box.dart';
 import '../../../core/models/chapter_page.dart';
@@ -311,15 +312,15 @@ class _MangaDetailScreenState extends State<MangaDetailScreen>
         return CallbackShortcuts(
           bindings: <ShortcutActivator, VoidCallback>{
             const SingleActivator(LogicalKeyboardKey.f5): () {
-              HapticFeedback.lightImpact();
+              AppHaptics.lightImpact();
               _controller.refresh();
             },
             const SingleActivator(LogicalKeyboardKey.keyR, control: true): () {
-              HapticFeedback.lightImpact();
+              AppHaptics.lightImpact();
               _controller.refresh();
             },
             const SingleActivator(LogicalKeyboardKey.keyR, meta: true): () {
-              HapticFeedback.lightImpact();
+              AppHaptics.lightImpact();
               _controller.refresh();
             },
             const SingleActivator(LogicalKeyboardKey.keyC): () {
@@ -333,7 +334,10 @@ class _MangaDetailScreenState extends State<MangaDetailScreen>
                 children: [
                   RefreshIndicator(
                     color: AppColors.primary,
-                    onRefresh: _controller.refresh,
+                    onRefresh: () async {
+                      AppHaptics.pullToRefresh();
+                      await _controller.refresh();
+                    },
                     child: CustomScrollView(
                       controller: _scrollController,
                       slivers: [

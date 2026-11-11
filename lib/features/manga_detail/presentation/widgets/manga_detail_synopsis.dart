@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../../core/constants/app_colors.dart';
+import '../../../../core/services/haptic_service.dart';
 
 class MangaDetailSynopsis extends StatefulWidget {
   final String? description;
@@ -79,7 +79,7 @@ class _MangaDetailSynopsisState extends State<MangaDetailSynopsis> {
           const SizedBox(height: 6),
           InkWell(
             onTap: () {
-              HapticFeedback.lightImpact();
+              AppHaptics.lightImpact();
               setState(() => _isExpanded = !_isExpanded);
             },
             borderRadius: BorderRadius.circular(6),

@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
+import '../../../../core/services/haptic_service.dart';
 import '../../../history/models/progression.dart';
 import '../../models/manga_detail.dart';
 import 'status_selection_sheet.dart';
@@ -141,7 +141,7 @@ class MangaDetailFloatingDock extends StatelessWidget {
                                 onTap: isLoadingChapters || activeTarget == null
                                     ? null
                                     : () {
-                                        HapticFeedback.lightImpact();
+                                        AppHaptics.mediumImpact();
                                         onReadChapter(activeTarget);
                                       },
                                 borderRadius: BorderRadius.circular(28),
@@ -209,7 +209,7 @@ class MangaDetailFloatingDock extends StatelessWidget {
       color: Colors.transparent,
       child: InkWell(
         onTap: () async {
-          HapticFeedback.lightImpact();
+          AppHaptics.selection();
           if (hasStatus) {
             _showLibraryOptionsSheet(context, isDark, colorScheme);
           } else {
@@ -446,11 +446,7 @@ class _FavoriteButtonState extends State<FavoriteButton>
 
   void _handleTap() {
     final nextState = !widget.isFavorite;
-    if (nextState) {
-      HapticFeedback.mediumImpact();
-    } else {
-      HapticFeedback.lightImpact();
-    }
+    AppHaptics.favorite(nextState);
 
     _controller.forward(from: 0.0);
     widget.onTap();

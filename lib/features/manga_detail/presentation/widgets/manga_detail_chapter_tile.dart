@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import 'package:cached_network_image_ce/cached_network_image.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../../core/di/injection.dart';
+import '../../../../core/services/haptic_service.dart';
 import '../../../../core/utils/formatters.dart';
 import '../../../download/models/downloaded_chapter.dart';
 import '../../../download/services/download_service.dart';
@@ -53,7 +53,7 @@ class MangaDetailChapterTile extends StatelessWidget {
     return InkWell(
       onTap: isAvailable
           ? () {
-              HapticFeedback.selectionClick();
+              AppHaptics.selection();
               onTap?.call();
             }
           : null,
@@ -559,7 +559,7 @@ class MangaDetailChapterTile extends StatelessWidget {
               tooltip: 'Download chapter',
               onPressed: isAvailable
                   ? () {
-                      HapticFeedback.selectionClick();
+                      AppHaptics.mediumImpact();
                       downloadService.downloadChapter(manga!, chapter);
                     }
                   : null,
