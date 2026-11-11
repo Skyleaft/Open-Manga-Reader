@@ -343,7 +343,6 @@ class _MangaDetailScreenState extends State<MangaDetailScreen>
                           heroImageUrl: heroImageUrl,
                           chapterCount: _controller.chapters.length,
                           heroTag: widget.heroTag,
-                          onRefresh: _controller.refresh,
                           onCoverTap: _openFullScreenCover,
                         ),
 
