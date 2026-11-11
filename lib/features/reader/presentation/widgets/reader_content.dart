@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:cached_network_image_ce/cached_network_image.dart';
 import '../../../../core/constants/app_colors.dart';
+import '../../../../core/services/haptic_service.dart';
 import '../../../../core/utils/url_utils.dart';
 import 'app_network_image.dart';
 import 'dart:math' as math;
@@ -374,7 +375,12 @@ class _ReaderContentWidgetState extends State<ReaderContentWidget> {
                         behavior: HitTestBehavior.opaque,
                         onTap: widget.isLoading
                             ? null
-                            : () => widget.onPageChanged(widget.pageUrls.length),
+                            : () {
+                                if (widget.hasNextChapter) {
+                                  AppHaptics.mediumImpact();
+                                  widget.onPageChanged(widget.pageUrls.length);
+                                }
+                              },
                         child: Column(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
@@ -387,7 +393,9 @@ class _ReaderContentWidgetState extends State<ReaderContentWidget> {
                               ),
                               child: Icon(
                                 widget.hasNextChapter
-                                    ? Icons.arrow_forward_rounded
+                                    ? (widget.isRtlMode
+                                        ? Icons.arrow_back_rounded
+                                        : Icons.arrow_forward_rounded)
                                     : Icons.check_circle_outline_rounded,
                                 color: AppColors.primary,
                                 size: 40,

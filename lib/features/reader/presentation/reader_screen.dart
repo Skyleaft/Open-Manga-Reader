@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 import 'dart:ui';
 import 'package:flutter/foundation.dart' show kDebugMode;
 import 'package:flutter/material.dart';
@@ -44,8 +45,9 @@ class _ReaderScreenState extends State<ReaderScreen>
   TapDownDetails? _doubleTapDetails;
   double? _targetScrollOffset;
   static const double _pullToNextThreshold = 90.0;
+  static const int _pullToNextSteps = 10;
   bool _isPullToNextArmed = false;
-  int _lastOverscrollMilestone = 0;
+  int _lastOverscrollStep = 0;
   Timer? _overscrollResetTimer;
 
   @override
@@ -342,38 +344,47 @@ class _ReaderScreenState extends State<ReaderScreen>
 
     final double progress =
         (overscrollAmount / _pullToNextThreshold).clamp(0.0, 1.0);
-    // Discrete tactile intervals: 0: 0-24%, 1: 25-49%, 2: 50-74%, 3: 75-99%, 4: 100%
-    final int currentMilestone = (progress * 4).floor().clamp(0, 4);
+    // Granular tactile intervals: ticks every 10% progress (0 to 10)
+    // giving a dynamic ratchet/dial tick sensation as overscroll percentage increases.
+    final int currentStep =
+        (progress * _pullToNextSteps).floor().clamp(0, _pullToNextSteps);
 
-    if (currentMilestone > _lastOverscrollMilestone) {
-      if (currentMilestone == 4) {
+    if (currentStep > _lastOverscrollStep) {
+      if (currentStep == _pullToNextSteps) {
         if (!_isPullToNextArmed) {
           _isPullToNextArmed = true;
           if (isInteractive) {
             AppHaptics.gestureThresholdActivate();
           }
         }
-      } else {
+      } else if (currentStep == (_pullToNextSteps ~/ 2)) {
+        // Halfway milestone (50% progress detent)
         if (isInteractive) {
           AppHaptics.segmentTick();
         }
+      } else {
+        if (isInteractive) {
+          AppHaptics.segmentFrequentTick();
+        }
       }
-      _lastOverscrollMilestone = currentMilestone;
-    } else if (currentMilestone < _lastOverscrollMilestone) {
-      if (_isPullToNextArmed && currentMilestone < 4) {
+      _lastOverscrollStep = currentStep;
+    } else if (currentStep < _lastOverscrollStep) {
+      if (_isPullToNextArmed && currentStep < _pullToNextSteps) {
         _isPullToNextArmed = false;
         if (isInteractive) {
           AppHaptics.gestureThresholdDeactivate();
         }
+      } else if (isInteractive && currentStep > 0) {
+        AppHaptics.segmentFrequentTick();
       }
-      _lastOverscrollMilestone = currentMilestone;
+      _lastOverscrollStep = currentStep;
     }
   }
 
   void _resetPullToNextOverscroll() {
     _controller.setAccumulatedBottomOverscroll(0.0);
     _isPullToNextArmed = false;
-    _lastOverscrollMilestone = 0;
+    _lastOverscrollStep = 0;
   }
 
   void _triggerPullToNextChapter() {
@@ -756,7 +767,7 @@ class _ReaderScreenState extends State<ReaderScreen>
 
     if (index == _controller.pageUrls.length) {
       if (!_controller.isLoading && !_controller.isChangingChapter) {
-        _changeChapter(true);
+        _triggerPullToNextChapter();
       }
       return;
     }
@@ -870,8 +881,7 @@ class _ReaderScreenState extends State<ReaderScreen>
                       _controller.setJumpingToPage(false);
                     }
                   } else if (notification is OverscrollNotification) {
-                    if (_controller.isWebtoonMode &&
-                        notification.overscroll > 0 &&
+                    if (notification.overscroll > 0 &&
                         notification.metrics.pixels >=
                             notification.metrics.maxScrollExtent - 5 &&
                         !_controller.isLoading &&
@@ -879,12 +889,14 @@ class _ReaderScreenState extends State<ReaderScreen>
                         !_controller.isRestoringScroll &&
                         !_controller.isJumpingToPage &&
                         !_controller.isSliderScrolling) {
-                      if (_controller.currentPage !=
-                          _controller.pageUrls.length) {
-                        _controller.updatePageAndProgress(
-                          _controller.pageUrls.length,
-                          1.0,
-                        );
+                      if (_controller.isWebtoonMode) {
+                        if (_controller.currentPage !=
+                            _controller.pageUrls.length) {
+                          _controller.updatePageAndProgress(
+                            _controller.pageUrls.length,
+                            1.0,
+                          );
+                        }
                       }
                       _updatePullToNextOverscroll(
                         _controller.accumulatedBottomOverscroll +
@@ -909,40 +921,78 @@ class _ReaderScreenState extends State<ReaderScreen>
                       );
                     }
                   } else if (notification is ScrollUpdateNotification) {
-                    if (_controller.isWebtoonMode &&
-                        !_controller.isLoading &&
+                    if (!_controller.isLoading &&
                         !_controller.isChangingChapter &&
                         !_controller.isRestoringScroll &&
                         !_controller.isJumpingToPage &&
                         !_controller.isSliderScrolling) {
-                      if (notification.metrics.pixels >
-                          notification.metrics.maxScrollExtent) {
-                        if (_controller.currentPage !=
-                            _controller.pageUrls.length) {
-                          _controller.updatePageAndProgress(
-                            _controller.pageUrls.length,
-                            1.0,
+                      if (_controller.isWebtoonMode) {
+                        if (notification.metrics.pixels >
+                            notification.metrics.maxScrollExtent) {
+                          if (_controller.currentPage !=
+                              _controller.pageUrls.length) {
+                            _controller.updatePageAndProgress(
+                              _controller.pageUrls.length,
+                              1.0,
+                            );
+                          }
+
+                          // Check if user has released drag while ballistic physics is running
+                          if (notification.dragDetails == null &&
+                              _isPullToNextArmed) {
+                            _triggerPullToNextChapter();
+                            return false;
+                          }
+
+                          final overscrollAmount =
+                              notification.metrics.pixels -
+                                  notification.metrics.maxScrollExtent;
+                          _updatePullToNextOverscroll(
+                            overscrollAmount,
+                            isInteractive: notification.dragDetails != null,
                           );
+                        } else if (notification.metrics.pixels <
+                                notification.metrics.maxScrollExtent - 20 &&
+                            _controller.accumulatedBottomOverscroll > 0) {
+                          _resetPullToNextOverscroll();
                         }
+                      } else {
+                        // Paged Mode: interactive swipe to next chapter
+                        final totalPages = _controller.pageUrls.length;
+                        if (totalPages > 0 &&
+                            notification.metrics.viewportDimension > 0) {
+                          final double lastPageOffset = (totalPages - 1) *
+                              notification.metrics.viewportDimension;
+                          if (notification.metrics.pixels > lastPageOffset) {
+                            // Check if user has released drag while ballistic physics is running
+                            if (notification.dragDetails == null &&
+                                _isPullToNextArmed) {
+                              _triggerPullToNextChapter();
+                              return false;
+                            }
 
-                        // Check if user has released drag while ballistic physics is running
-                        if (notification.dragDetails == null &&
-                            _isPullToNextArmed) {
-                          _triggerPullToNextChapter();
-                          return false;
+                            final double swipeDistance =
+                                notification.metrics.pixels - lastPageOffset;
+                            final double swipeThreshold = math.min(
+                              notification.metrics.viewportDimension * 0.35,
+                              140.0,
+                            );
+                            final double progress = (swipeDistance /
+                                    swipeThreshold)
+                                .clamp(0.0, 1.0);
+                            final double overscrollAmount =
+                                progress * _pullToNextThreshold;
+
+                            _updatePullToNextOverscroll(
+                              overscrollAmount,
+                              isInteractive: notification.dragDetails != null,
+                            );
+                          } else if (notification.metrics.pixels <=
+                                  lastPageOffset &&
+                              _controller.accumulatedBottomOverscroll > 0) {
+                            _resetPullToNextOverscroll();
+                          }
                         }
-
-                        final overscrollAmount =
-                            notification.metrics.pixels -
-                                notification.metrics.maxScrollExtent;
-                        _updatePullToNextOverscroll(
-                          overscrollAmount,
-                          isInteractive: notification.dragDetails != null,
-                        );
-                      } else if (notification.metrics.pixels <
-                              notification.metrics.maxScrollExtent - 20 &&
-                          _controller.accumulatedBottomOverscroll > 0) {
-                        _resetPullToNextOverscroll();
                       }
                     }
                   } else if (notification is ScrollEndNotification) {
@@ -1230,7 +1280,7 @@ class _ReaderScreenState extends State<ReaderScreen>
                   ),
                 ),
 
-              // Pull-to-Next Chapter Interactive Overscroll Pill (Webtoon Mode)
+              // Pull/Swipe-to-Next Chapter Interactive Overscroll Pill (Webtoon & Paged Mode)
               ValueListenableBuilder<double>(
                 valueListenable: _controller.accumulatedBottomOverscrollNotifier,
                 builder: (context, overscroll, _) {
@@ -1341,7 +1391,11 @@ class _ReaderScreenState extends State<ReaderScreen>
                                               child: Icon(
                                                 isTriggered
                                                     ? Icons.check_rounded
-                                                    : Icons.arrow_upward_rounded,
+                                                    : (_controller.isWebtoonMode
+                                                        ? Icons.arrow_upward_rounded
+                                                        : (_controller.isRtlMode
+                                                            ? Icons.arrow_back_rounded
+                                                            : Icons.arrow_forward_rounded)),
                                                 color: isTriggered
                                                     ? const Color(0xFF10B981)
                                                     : Colors.white,
@@ -1355,7 +1409,9 @@ class _ReaderScreenState extends State<ReaderScreen>
                                       Text(
                                         isTriggered
                                             ? 'Release for Next Chapter'
-                                            : 'Pull for Next Chapter • ${(progress * 100).toInt()}%',
+                                            : (_controller.isWebtoonMode
+                                                ? 'Pull for Next Chapter • ${(progress * 100).toInt()}%'
+                                                : 'Swipe for Next Chapter • ${(progress * 100).toInt()}%'),
                                         style: TextStyle(
                                           color: isTriggered
                                               ? const Color(0xFF10B981)
