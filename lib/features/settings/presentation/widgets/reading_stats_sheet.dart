@@ -180,6 +180,8 @@ class _ReadingStatsBottomSheetState extends State<ReadingStatsBottomSheet> {
                 : ListView.separated(
                     padding: const EdgeInsets.fromLTRB(20, 16, 20, 32),
                     itemCount: sortedList.length,
+                    itemExtentBuilder: (index, dimensions) =>
+                        index.isEven ? 96.0 : 12.0,
                     separatorBuilder: (_, _) => const SizedBox(height: 12),
                     itemBuilder: (context, index) {
                       final p = sortedList[index];

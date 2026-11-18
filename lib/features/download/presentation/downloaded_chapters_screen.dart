@@ -89,20 +89,24 @@ class _DownloadedChaptersScreenState extends State<DownloadedChaptersScreen> {
                     // Manga Groups List
                     SliverPadding(
                       padding: const EdgeInsets.symmetric(horizontal: 16),
-                      sliver: SliverList(
-                        delegate: SliverChildBuilderDelegate(
-                          (context, index) {
-                            final group = _groups[index];
-                            return Padding(
-                              padding: const EdgeInsets.only(bottom: 12),
-                              child: _buildMangaGroupCard(
-                                context,
-                                group,
-                                isDark,
-                              ),
-                            );
-                          },
-                          childCount: _groups.length,
+                      sliver: SliverClipRRect(
+                        clipOverlap: ClipOverlapBehavior.preserveShape,
+                        borderRadius: BorderRadius.circular(16),
+                        sliver: SliverList(
+                          delegate: SliverChildBuilderDelegate(
+                            (context, index) {
+                              final group = _groups[index];
+                              return Padding(
+                                padding: const EdgeInsets.only(bottom: 12),
+                                child: _buildMangaGroupCard(
+                                  context,
+                                  group,
+                                  isDark,
+                                ),
+                              );
+                            },
+                            childCount: _groups.length,
+                          ),
                         ),
                       ),
                     ),

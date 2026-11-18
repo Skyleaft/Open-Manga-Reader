@@ -187,6 +187,8 @@ class _ChaptersReadBottomSheetState extends State<ChaptersReadBottomSheet> {
                     ? ListView.separated(
                         padding: const EdgeInsets.fromLTRB(20, 16, 20, 32),
                         itemCount: completedLogs.length,
+                        itemExtentBuilder: (index, dimensions) =>
+                            index.isEven ? 84.0 : 10.0,
                         separatorBuilder: (_, _) => const SizedBox(height: 10),
                         itemBuilder: (context, index) {
                           final item = completedLogs[index];
@@ -344,6 +346,8 @@ class _ChaptersReadBottomSheetState extends State<ChaptersReadBottomSheet> {
                     : ListView.separated(
                         padding: const EdgeInsets.fromLTRB(20, 16, 20, 32),
                         itemCount: groupedList.length,
+                        itemExtentBuilder: (index, dimensions) =>
+                            index.isEven ? 84.0 : 10.0,
                         separatorBuilder: (_, _) => const SizedBox(height: 10),
                         itemBuilder: (context, index) {
                           final entry = groupedList[index];
