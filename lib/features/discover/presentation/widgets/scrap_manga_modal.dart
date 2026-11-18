@@ -292,6 +292,8 @@ class _ScrapMangaModalState extends State<ScrapMangaModal> {
                 : ListView.separated(
                     shrinkWrap: true,
                     itemCount: detail.chapters.length,
+                    itemExtentBuilder: (index, dimensions) =>
+                        index.isEven ? 56.0 : 1.0,
                     separatorBuilder: (context, index) =>
                         const Divider(height: 1),
                     itemBuilder: (context, index) {

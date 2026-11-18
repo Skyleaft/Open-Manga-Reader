@@ -404,6 +404,8 @@ class ThemeSettingScreen extends StatelessWidget {
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
       itemCount: schemes.length,
+      itemExtentBuilder: (index, dimensions) =>
+          index.isEven ? 68.0 : 10.0,
       separatorBuilder: (context, index) => const SizedBox(height: 10),
       itemBuilder: (context, index) {
         final scheme = schemes[index];

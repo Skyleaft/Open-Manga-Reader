@@ -4,6 +4,7 @@ import 'package:cached_network_image_ce/cached_network_image.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/services/haptic_service.dart';
 import '../../../../core/utils/url_utils.dart';
+import '../../../../core/widgets/dynamic_scroll_physics.dart';
 import 'app_network_image.dart';
 import 'dart:math' as math;
 
@@ -147,14 +148,14 @@ class _ReaderContentWidgetState extends State<ReaderContentWidget> {
                   key: PageStorageKey('webtoon_scroll_${widget.chapterId ?? "default"}'),
                   scrollCacheExtent: const ScrollCacheExtent.pixels(1500),
                   controller: widget.scrollController,
-                  physics:
-                      widget.transformationController.value
-                                  .getMaxScaleOnAxis() >
-                              1
-                          ? const NeverScrollableScrollPhysics()
-                          : const BouncingScrollPhysics(
-                              parent: AlwaysScrollableScrollPhysics(),
-                            ),
+                  physics: ReaderScrollPhysics(
+                    isZoomed: widget.transformationController.value
+                            .getMaxScaleOnAxis() >
+                        1,
+                    parent: const BouncingScrollPhysics(
+                      parent: AlwaysScrollableScrollPhysics(),
+                    ),
+                  ),
                   slivers: [
                     SliverVariedExtentList(
                       itemExtentBuilder: (index, dimensions) {

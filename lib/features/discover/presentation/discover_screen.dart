@@ -432,28 +432,32 @@ class _DiscoverScreenState extends State<DiscoverScreen>
                 else ...[
                   SliverPadding(
                     padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
-                    sliver: SliverGrid(
-                      gridDelegate: _buildGridDelegate(),
-                      delegate: SliverChildBuilderDelegate(
-                        (context, index) {
-                          final item = _controller.items[index];
-                          return DiscoverCard(
-                            title: item.title,
-                            type: item.type,
-                            latestChapter: item.latestChapter,
-                            views: formatViewCount(item.totalView),
-                            genres: item.genres ?? [],
-                            status: item.status,
-                            rating: item.rating,
-                            heroTag: 'manga-cover-discover-${item.id}',
-                            imageUrl: _apiService.getLocalImageUrl(
-                              item.localImageUrl,
-                              item.imageUrl,
-                            ),
-                            onTap: () => _navigateToDetail(item),
-                          );
-                        },
-                        childCount: _controller.items.length,
+                    sliver: SliverClipRRect(
+                      clipOverlap: ClipOverlapBehavior.preserveShape,
+                      borderRadius: BorderRadius.circular(16),
+                      sliver: SliverGrid(
+                        gridDelegate: _buildGridDelegate(),
+                        delegate: SliverChildBuilderDelegate(
+                          (context, index) {
+                            final item = _controller.items[index];
+                            return DiscoverCard(
+                              title: item.title,
+                              type: item.type,
+                              latestChapter: item.latestChapter,
+                              views: formatViewCount(item.totalView),
+                              genres: item.genres ?? [],
+                              status: item.status,
+                              rating: item.rating,
+                              heroTag: 'manga-cover-discover-${item.id}',
+                              imageUrl: _apiService.getLocalImageUrl(
+                                item.localImageUrl,
+                                item.imageUrl,
+                              ),
+                              onTap: () => _navigateToDetail(item),
+                            );
+                          },
+                          childCount: _controller.items.length,
+                        ),
                       ),
                     ),
                   ),

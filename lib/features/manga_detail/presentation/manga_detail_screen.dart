@@ -727,9 +727,12 @@ class _MangaDetailScreenState extends State<MangaDetailScreen>
         : AppColors.backgroundLight;
 
     if (_controller.isLoadingChapters || !_isTransitionComplete) {
-      return SliverList(
-        delegate: SliverChildBuilderDelegate(
-          (context, index) {
+      return SliverClipRRect(
+        clipOverlap: ClipOverlapBehavior.preserveShape,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+        sliver: SliverList(
+          delegate: SliverChildBuilderDelegate(
+            (context, index) {
             return Container(
               color: bgColor,
               child: Center(
@@ -784,8 +787,9 @@ class _MangaDetailScreenState extends State<MangaDetailScreen>
           },
           childCount: 6,
         ),
-      );
-    }
+      ),
+    );
+  }
 
     final chapters = _controller.filteredChapters;
 
@@ -835,30 +839,34 @@ class _MangaDetailScreenState extends State<MangaDetailScreen>
       );
     }
 
-    return SliverList(
-      delegate: SliverChildBuilderDelegate(
-        (context, index) {
-          final chapter = chapters[index];
-          return Container(
-            color: bgColor,
-            child: Center(
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 1100),
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(20, 0, 20, 12),
-                  child: MangaDetailChapterTile(
-                    manga: widget.manga,
-                    chapter: chapter,
-                    isDark: isDark,
-                    log: _controller.getLogForChapter(chapter.chapterNumber),
-                    onTap: () => _navigateToReader(context, chapter),
+    return SliverClipRRect(
+      clipOverlap: ClipOverlapBehavior.preserveShape,
+      borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+      sliver: SliverList(
+        delegate: SliverChildBuilderDelegate(
+          (context, index) {
+            final chapter = chapters[index];
+            return Container(
+              color: bgColor,
+              child: Center(
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 1100),
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(20, 0, 20, 12),
+                    child: MangaDetailChapterTile(
+                      manga: widget.manga,
+                      chapter: chapter,
+                      isDark: isDark,
+                      log: _controller.getLogForChapter(chapter.chapterNumber),
+                      onTap: () => _navigateToReader(context, chapter),
+                    ),
                   ),
                 ),
               ),
-            ),
-          );
-        },
-        childCount: chapters.length,
+            );
+          },
+          childCount: chapters.length,
+        ),
       ),
     );
   }

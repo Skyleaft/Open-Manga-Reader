@@ -422,7 +422,11 @@ class _LibraryScreenState extends State<LibraryScreen>
                 if (_isOffline) _buildOfflineBanner(isDark),
                 SliverPadding(
                   padding: const EdgeInsets.fromLTRB(16, 16, 16, 150),
-                  sliver: _buildContent(context, isDark),
+                  sliver: SliverClipRRect(
+                    clipOverlap: ClipOverlapBehavior.preserveShape,
+                    borderRadius: BorderRadius.circular(16),
+                    sliver: _buildContent(context, isDark),
+                  ),
                 ),
               ],
             ),
