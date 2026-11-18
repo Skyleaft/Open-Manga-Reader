@@ -1,4 +1,5 @@
-import 'package:flutter/material.dart';
+import 'package:flutter/material.dart' as flutter_material;
+import 'package:material_ui/material_ui.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/services/haptic_service.dart';
@@ -319,17 +320,20 @@ class _HapticSettingsBottomSheetState extends State<HapticSettingsBottomSheet> {
                         ),
                         child: Column(
                           children: [
-                            HapticSlider(
-                              value: _sliderValue,
-                              min: 0.0,
-                              max: 1.0,
-                              divisions: 10,
-                              activeColor: colorScheme.primary,
-                              onChanged: (v) {
-                                setState(() {
-                                  _sliderValue = v;
-                                });
-                              },
+                            flutter_material.Material(
+                              type: flutter_material.MaterialType.transparency,
+                              child: HapticSlider(
+                                value: _sliderValue,
+                                min: 0.0,
+                                max: 1.0,
+                                divisions: 10,
+                                activeColor: colorScheme.primary,
+                                onChanged: (v) {
+                                  setState(() {
+                                    _sliderValue = v;
+                                  });
+                                },
+                              ),
                             ),
                             Text(
                               'Detent Ticks: ${(_sliderValue * 100).toInt()}%',

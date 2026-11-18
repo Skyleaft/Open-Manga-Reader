@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import '../features/auth/presentation/login_screen.dart';
 import '../features/main/presentation/main_screen.dart';
 import '../features/manga_detail/presentation/manga_detail_screen.dart';

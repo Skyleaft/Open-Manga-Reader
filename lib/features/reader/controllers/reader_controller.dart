@@ -4,7 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/painting.dart';
 import 'package:dio/dio.dart';
-import 'package:window_manager/window_manager.dart';
+import 'package:window_manager/legacy.dart';
 
 import '../../../core/di/injection.dart';
 import '../../../core/network/manga_api_service.dart';

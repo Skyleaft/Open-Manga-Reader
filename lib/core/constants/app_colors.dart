@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import '../di/injection.dart';
 import '../theme/theme_provider.dart';
 

@@ -1,5 +1,5 @@
 import 'package:cached_network_image_ce/cached_network_image.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import '../constants/app_colors.dart';
 import '../network/manga_api_service.dart';
 import '../di/injection.dart';

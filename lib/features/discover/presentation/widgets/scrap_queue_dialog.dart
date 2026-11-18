@@ -1,5 +1,5 @@
 import 'dart:async';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import '../../../../core/di/injection.dart';
 import '../../../../core/network/manga_api_service.dart';
 import '../../models/queue_item.dart';
