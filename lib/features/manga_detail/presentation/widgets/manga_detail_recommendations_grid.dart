@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/models/manga_summary.dart';
 import '../../../../core/utils/formatters.dart';

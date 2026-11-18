@@ -1,3 +1,5 @@
+include: package:flutter_lints/flutter.yaml
+
 analyzer:
   exclude:
     - build/**
@@ -7,4 +9,6 @@ analyzer:
     - windows/**
     - macos/**
     - linux/**
-include: package:flutter_lints/flutter.yaml
+  errors:
+    deprecated_member_use: ignore
+    prefer_initializing_formals: ignore

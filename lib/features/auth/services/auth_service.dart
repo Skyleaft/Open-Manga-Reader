@@ -15,7 +15,18 @@ import 'google_desktop_auth.dart';
 
 class AuthService {
   final FirebaseAuth _auth = FirebaseAuth.instance;
-  final GoogleSignIn _googleSignIn = GoogleSignIn();
+  final GoogleSignIn _googleSignIn = GoogleSignIn.instance;
+  bool _googleSignInInitialized = false;
+
+  Future<void> _ensureGoogleSignInInitialized() async {
+    if (_googleSignInInitialized) return;
+    try {
+      await _googleSignIn.initialize();
+      _googleSignInInitialized = true;
+    } catch (e) {
+      debugPrint('GoogleSignIn initialize error: $e');
+    }
+  }
 
   late final GoogleDesktopAuth _desktopAuth = GoogleDesktopAuth(
     clientId: dotenv.env['GOOGLE_DESKTOP_CLIENT_ID'] ??
@@ -83,14 +94,20 @@ class AuthService {
         return userCredential.user;
       }
 
-      final GoogleSignInAccount? googleUser = await _googleSignIn.signIn();
-      if (googleUser == null) return null;
+      await _ensureGoogleSignInInitialized();
+      final GoogleSignInAccount googleUser;
+      try {
+        googleUser = await _googleSignIn.authenticate();
+      } on GoogleSignInException catch (e) {
+        if (e.code == GoogleSignInExceptionCode.canceled) {
+          return null;
+        }
+        rethrow;
+      }
 
-      final GoogleSignInAuthentication googleAuth =
-          await googleUser.authentication;
+      final GoogleSignInAuthentication googleAuth = googleUser.authentication;
 
       final credential = GoogleAuthProvider.credential(
-        accessToken: googleAuth.accessToken,
         idToken: googleAuth.idToken,
       );
 

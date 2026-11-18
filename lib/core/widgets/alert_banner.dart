@@ -1,5 +1,5 @@
 import 'dart:async';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:my_manga_reader/core/constants/app_colors.dart';
 import 'package:my_manga_reader/routes/app_pages.dart';
 

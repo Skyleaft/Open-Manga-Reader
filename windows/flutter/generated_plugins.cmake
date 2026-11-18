@@ -6,14 +6,12 @@ list(APPEND FLUTTER_PLUGIN_LIST
   app_links
   battery_plus
   connectivity_plus
-  firebase_auth
   firebase_core
+  firebase_auth
   flutter_avif_windows
-  protocol_handler_windows
-  screen_retriever_windows
-  share_plus
+  protocol_handler
   url_launcher_windows
-  window_manager
+  share_plus
 )
 
 list(APPEND FLUTTER_FFI_PLUGIN_LIST
