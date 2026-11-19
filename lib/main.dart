@@ -11,7 +11,6 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'firebase_options.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'core/storage/hive_storage.dart';
-import 'core/config/app_config.dart';
 import 'core/services/notification_service.dart';
 
 void main() async {
