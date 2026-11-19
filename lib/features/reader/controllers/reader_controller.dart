@@ -342,7 +342,7 @@ class ReaderController extends ChangeNotifier {
 
   void _maybePrefetchNextChapter() {
     if (_isPrefetchingNextChapter || _pageUrls.isEmpty) return;
-    if (_currentPageNotifier.value >= _pageUrls.length - 2 && hasNextChapter) {
+    if (_currentPageNotifier.value >= _pageUrls.length - 2) {
       final nextChapter = _content.getNextChapter(_chapterId, _currentChapterNumber);
       if (nextChapter != null && _apiService != null) {
         if (_downloadService?.isChapterDownloaded(_content.mangaId, nextChapter.id) == true) {

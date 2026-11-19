@@ -92,7 +92,7 @@ class LibraryController extends ChangeNotifier {
           m.title.toLowerCase().contains(_searchQuery.toLowerCase()) ||
           m.author.toLowerCase().contains(_searchQuery.toLowerCase());
       final matchesFav = !_showFavoritesOnly || m.isFavorite;
-      final matchesDownloaded = !_showDownloadedOnly || _isMangaDownloaded(m.mangaId);
+      final matchesDownloaded = !_showDownloadedOnly || _isMangaDownloaded(m.id);
 
       return matchesStatus && matchesSearch && matchesFav && matchesDownloaded;
     }).toList();
