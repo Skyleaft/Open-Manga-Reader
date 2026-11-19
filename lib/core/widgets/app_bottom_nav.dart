@@ -1,4 +1,5 @@
 import 'dart:ui';
+import 'package:flutter/material.dart' as flutter_material;
 import 'package:material_ui/material_ui.dart';
 import 'package:animated_icon/animated_icon.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -51,9 +52,11 @@ class AppBottomNav extends StatelessWidget {
         ? Colors.white.withValues(alpha: 0.1)
         : Colors.black.withValues(alpha: 0.06);
 
-    return Align(
-      alignment: Alignment.bottomCenter,
-      child: ConstrainedBox(
+    return flutter_material.Material(
+      type: flutter_material.MaterialType.transparency,
+      child: Align(
+        alignment: Alignment.bottomCenter,
+        child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 540),
         child: Container(
           margin: margin,
@@ -78,14 +81,15 @@ class AppBottomNav extends StatelessWidget {
             borderRadius: BorderRadius.circular(borderRadius),
             child: BackdropFilter(
               filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
-                decoration: BoxDecoration(
-                  color: navBgColor,
-                  borderRadius: BorderRadius.circular(borderRadius),
-                  border: Border.all(color: navBorderColor, width: 1),
-                ),
-                child: Row(
+              child: Material(
+                color: navBgColor,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(borderRadius),
+                    border: Border.all(color: navBorderColor, width: 1),
+                  ),
+                  child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceAround,
                   children: [
                     _buildNavItem(
@@ -123,8 +127,10 @@ class AppBottomNav extends StatelessWidget {
           ),
         ),
       ),
-    );
-  }
+    ),
+  ),
+);
+}
 
   Widget _buildNavItem(
     BuildContext context,
@@ -138,15 +144,17 @@ class AppBottomNav extends StatelessWidget {
     final colorScheme = theme.colorScheme;
     final isDark = theme.brightness == Brightness.dark;
 
-    return InkWell(
-      onTap: () {
-        AppHaptics.selection();
-        onTap(index);
-      },
-      borderRadius: BorderRadius.circular(24),
-      splashColor: colorScheme.primary.withValues(alpha: 0.15),
-      highlightColor: colorScheme.primary.withValues(alpha: 0.08),
-      child: AnimatedContainer(
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: () {
+          AppHaptics.selection();
+          onTap(index);
+        },
+        borderRadius: BorderRadius.circular(24),
+        splashColor: colorScheme.primary.withValues(alpha: 0.15),
+        highlightColor: colorScheme.primary.withValues(alpha: 0.08),
+        child: AnimatedContainer(
         duration: const Duration(milliseconds: 280),
         curve: Curves.easeOutCubic,
         padding: EdgeInsets.symmetric(
@@ -172,21 +180,24 @@ class AppBottomNav extends StatelessWidget {
               scale: isActive ? 1.08 : 1.0,
               duration: const Duration(milliseconds: 250),
               curve: Curves.easeOutBack,
-              child: AnimateIcon(
-                key: ValueKey('nav_item_$index'),
-                onTap: () {
-                  AppHaptics.selection();
-                  onTap(index);
-                },
-                iconType: IconType.animatedOnTap,
-                height: 22,
-                width: 22,
-                color: isActive
-                    ? colorScheme.primary
-                    : isDark
-                    ? Colors.white60
-                    : AppColors.secondary,
-                animateIcon: animateIcon,
+              child: flutter_material.Material(
+                type: flutter_material.MaterialType.transparency,
+                child: AnimateIcon(
+                  key: ValueKey('nav_item_$index'),
+                  onTap: () {
+                    AppHaptics.selection();
+                    onTap(index);
+                  },
+                  iconType: IconType.animatedOnTap,
+                  height: 22,
+                  width: 22,
+                  color: isActive
+                      ? colorScheme.primary
+                      : isDark
+                      ? Colors.white60
+                      : AppColors.secondary,
+                  animateIcon: animateIcon,
+                ),
               ),
             ),
             ClipRect(
@@ -221,6 +232,7 @@ class AppBottomNav extends StatelessWidget {
           ],
         ),
       ),
-    );
-  }
+    ),
+  );
+}
 }

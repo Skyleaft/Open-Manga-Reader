@@ -28,15 +28,26 @@ class AuthService {
     }
   }
 
+  static String _getEnv(String key) {
+    try {
+      if (dotenv.isInitialized) {
+        return dotenv.maybeGet(key) ?? '';
+      }
+    } catch (_) {}
+    return '';
+  }
+
   late final GoogleDesktopAuth _desktopAuth = GoogleDesktopAuth(
-    clientId: dotenv.env['GOOGLE_DESKTOP_CLIENT_ID'] ??
-        dotenv.env['GOOGLE_CLIENT_ID'] ??
-        dotenv.env['FIREBASE_WINDOWS_CLIENT_ID'] ??
-        dotenv.env['FIREBASE_WEB_CLIENT_ID'] ??
-        '',
-    clientSecret: dotenv.env['GOOGLE_DESKTOP_CLIENT_SECRET'] ??
-        dotenv.env['GOOGLE_CLIENT_SECRET'] ??
-        '',
+    clientId: [
+      _getEnv('GOOGLE_DESKTOP_CLIENT_ID'),
+      _getEnv('GOOGLE_CLIENT_ID'),
+      _getEnv('FIREBASE_WINDOWS_CLIENT_ID'),
+      _getEnv('FIREBASE_WEB_CLIENT_ID'),
+    ].firstWhere((id) => id.isNotEmpty, orElse: () => ''),
+    clientSecret: [
+      _getEnv('GOOGLE_DESKTOP_CLIENT_SECRET'),
+      _getEnv('GOOGLE_CLIENT_SECRET'),
+    ].firstWhere((secret) => secret.isNotEmpty, orElse: () => ''),
   );
 
   Stream<User?> get authStateChanges => _auth.authStateChanges();

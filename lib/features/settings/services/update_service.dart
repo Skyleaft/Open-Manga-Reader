@@ -1,27 +1,18 @@
-import 'dart:ffi';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:dio/dio.dart';
 import 'package:open_filex/open_filex.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:path_provider/path_provider.dart';
+import '../../../core/utils/abi_helper.dart';
 
 class UpdateService {
   final Dio _dio = Dio();
 
   /// Mendeteksi ABI perangkat Android saat ini (e.g. arm64-v8a, armeabi-v7a, x86_64)
   String getAndroidAbi() {
-    if (kIsWeb || !Platform.isAndroid) return '';
-    try {
-      final abiStr = Abi.current().toString().toLowerCase();
-      if (abiStr.contains('arm64')) return 'arm64-v8a';
-      if (abiStr.contains('arm')) return 'armeabi-v7a';
-      if (abiStr.contains('x64') || abiStr.contains('x86_64')) return 'x86_64';
-      if (abiStr.contains('ia32') || abiStr.contains('x86')) return 'x86';
-      return '';
-    } catch (_) {
-      return '';
-    }
+    if (kIsWeb) return '';
+    return getPlatformAbi();
   }
 
   Future<Map<String, dynamic>?> getLatestReleaseInfo() async {

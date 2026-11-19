@@ -14,7 +14,9 @@ import '../network/manga_api_service.dart';
 
 @pragma('vm:entry-point')
 Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
-  debugPrint('Handling background FCM message: ${message.messageId}, data: ${message.data}');
+  debugPrint(
+    'Handling background FCM message: ${message.messageId}, data: ${message.data}',
+  );
 }
 
 class NotificationService {
@@ -54,17 +56,22 @@ class NotificationService {
 
     try {
       await _initLocalNotifications();
-      await _requestPermissions();
       await _initMessageListeners();
       await _checkInitialMessage();
-      await syncFcmToken();
     } catch (e) {
       debugPrint('Error initializing NotificationService: $e');
     }
   }
 
+  /// Request runtime notification permissions safely after UI is ready.
+  Future<void> requestPermissions() async {
+    await _requestPermissions();
+  }
+
   Future<void> _initLocalNotifications() async {
-    const androidSettings = AndroidInitializationSettings('@mipmap/ic_launcher');
+    const androidSettings = AndroidInitializationSettings(
+      '@mipmap/ic_launcher',
+    );
     const darwinSettings = DarwinInitializationSettings(
       requestAlertPermission: true,
       requestBadgePermission: true,
@@ -90,7 +97,8 @@ class NotificationService {
     if (!kIsWeb && Platform.isAndroid) {
       final androidPlugin = _localNotifications
           .resolvePlatformSpecificImplementation<
-              AndroidFlutterLocalNotificationsPlugin>();
+            AndroidFlutterLocalNotificationsPlugin
+          >();
       await androidPlugin?.createNotificationChannel(_channel);
     }
   }
@@ -109,12 +117,15 @@ class NotificationService {
         sound: true,
       );
 
-      debugPrint('FCM Notification permission status: ${settings.authorizationStatus}');
+      debugPrint(
+        'FCM Notification permission status: ${settings.authorizationStatus}',
+      );
 
       if (!kIsWeb && Platform.isAndroid) {
         final androidPlugin = _localNotifications
             .resolvePlatformSpecificImplementation<
-                AndroidFlutterLocalNotificationsPlugin>();
+              AndroidFlutterLocalNotificationsPlugin
+            >();
         await androidPlugin?.requestNotificationsPermission();
       }
     } catch (e) {
@@ -126,22 +137,25 @@ class NotificationService {
     if (_messaging == null) return;
 
     // 1. Foreground FCM messages -> display local notification
-    _foregroundMessageSubscription =
-        FirebaseMessaging.onMessage.listen((RemoteMessage message) {
+    _foregroundMessageSubscription = FirebaseMessaging.onMessage.listen((
+      RemoteMessage message,
+    ) {
       debugPrint('Received foreground FCM message: ${message.messageId}');
       _showLocalNotification(message);
     });
 
     // 2. Background FCM messages clicked by user
-    _messageOpenedAppSubscription =
-        FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) {
-      debugPrint('App opened from background FCM message: ${message.data}');
-      _handleRemoteMessageClick(message);
-    });
+    _messageOpenedAppSubscription = FirebaseMessaging.onMessageOpenedApp.listen(
+      (RemoteMessage message) {
+        debugPrint('App opened from background FCM message: ${message.data}');
+        _handleRemoteMessageClick(message);
+      },
+    );
 
     // 3. Token refresh listener
-    _tokenRefreshSubscription =
-        _messaging!.onTokenRefresh.listen((newToken) async {
+    _tokenRefreshSubscription = _messaging!.onTokenRefresh.listen((
+      newToken,
+    ) async {
       debugPrint('FCM Token refreshed: $newToken');
       await _registerTokenWithBackend(newToken);
     });
@@ -153,7 +167,9 @@ class NotificationService {
     try {
       final initialMessage = await _messaging!.getInitialMessage();
       if (initialMessage != null) {
-        debugPrint('App launched from terminated state via FCM: ${initialMessage.data}');
+        debugPrint(
+          'App launched from terminated state via FCM: ${initialMessage.data}',
+        );
         _handleRemoteMessageClick(initialMessage);
       }
     } catch (e) {
@@ -165,8 +181,10 @@ class NotificationService {
     final notification = message.notification;
     final data = message.data;
 
-    final title = notification?.title ?? data['mangaTitle'] ?? 'New Chapter Available';
-    final body = notification?.body ??
+    final title =
+        notification?.title ?? data['mangaTitle'] ?? 'New Chapter Available';
+    final body =
+        notification?.body ??
         (data['chapterNumber'] != null
             ? 'Chapter ${data['chapterNumber']} has been released!'
             : 'A new chapter is ready to read.');
@@ -194,7 +212,9 @@ class NotificationService {
       macOS: darwinDetails,
     );
 
-    final notificationId = DateTime.now().millisecondsSinceEpoch.remainder(100000);
+    final notificationId = DateTime.now().millisecondsSinceEpoch.remainder(
+      100000,
+    );
 
     await _localNotifications.show(
       id: notificationId,
@@ -295,8 +315,8 @@ class NotificationService {
 
     try {
       final prefs = await SharedPreferences.getInstance();
-      final lastToken = prefs.getString(_lastFcmTokenKey) ??
-          await _messaging?.getToken();
+      final lastToken =
+          prefs.getString(_lastFcmTokenKey) ?? await _messaging?.getToken();
 
       // 1. Unsubscribe from topics while token is still active on FCM server
       await clearAllSubscribedTopics();
@@ -326,7 +346,10 @@ class NotificationService {
   // --- Library Topic Subscriptions ---
 
   String _formatTopicName(String mangaId) {
-    final sanitized = mangaId.trim().replaceAll(RegExp(r'[^a-zA-Z0-9-_.~%]'), '_');
+    final sanitized = mangaId.trim().replaceAll(
+      RegExp(r'[^a-zA-Z0-9-_.~%]'),
+      '_',
+    );
     return 'manga_$sanitized';
   }
 
@@ -371,7 +394,8 @@ class NotificationService {
 
     try {
       final prefs = await SharedPreferences.getInstance();
-      final previouslySubscribed = prefs.getStringList(_subscribedTopicsKey) ?? [];
+      final previouslySubscribed =
+          prefs.getStringList(_subscribedTopicsKey) ?? [];
 
       // Unsubscribe from topics that are no longer in the user's library
       final toRemove = previouslySubscribed
@@ -387,7 +411,9 @@ class NotificationService {
       }
 
       await prefs.setStringList(_subscribedTopicsKey, currentLibraryMangaIds);
-      debugPrint('FCM Library topics synchronized. Total: ${currentLibraryMangaIds.length}');
+      debugPrint(
+        'FCM Library topics synchronized. Total: ${currentLibraryMangaIds.length}',
+      );
     } catch (e) {
       debugPrint('Error syncing FCM library topics: $e');
     }
