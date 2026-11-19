@@ -9,6 +9,7 @@ enum DownloadStatus {
   completed,
   failed,
   canceled,
+  paused,
 }
 
 class DownloadedChapter {
@@ -125,6 +126,7 @@ class DownloadTask {
   bool get isCompleted => status == DownloadStatus.completed;
   bool get isFailed => status == DownloadStatus.failed;
   bool get isCanceled => status == DownloadStatus.canceled;
+  bool get isPaused => status == DownloadStatus.paused;
 
   DownloadTask copyWith({
     String? mangaId,

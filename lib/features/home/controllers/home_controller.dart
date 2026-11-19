@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import '../../../core/di/injection.dart';
 import '../../../core/models/manga_summary.dart';
 import '../../../core/network/manga_api_service.dart';
+import '../../../core/services/network_status_service.dart';
 import '../../history/models/progression.dart';
 import '../../history/services/progression_service.dart';
 import '../../manga_detail/models/manga_detail.dart';
@@ -86,6 +87,20 @@ class HomeController extends ChangeNotifier {
   }
 
   Future<void> fetchAllData({bool syncProgressionFirst = true}) async {
+    final isOffline = getIt.isRegistered<NetworkStatusService>() &&
+        !getIt<NetworkStatusService>().isOnline;
+
+    if (isOffline) {
+      try {
+        await fetchHistory(forceSync: false);
+      } catch (_) {}
+      _isLoadingLatest = false;
+      _isLoadingRecommended = false;
+      _isLoadingTop = false;
+      _safeNotifyListeners();
+      return;
+    }
+
     if (syncProgressionFirst) {
       // 1. Fetch & sync progression first so continue reading and recommendations reflect latest state from other devices
       try {

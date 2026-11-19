@@ -5,6 +5,7 @@ import 'package:flutter/painting.dart';
 import 'package:dio/dio.dart';
 
 import '../../../core/di/injection.dart';
+import '../../../core/models/chapter_page.dart';
 import '../../../core/network/manga_api_service.dart';
 import '../../../core/services/window_service.dart';
 import '../../download/services/download_service.dart';
@@ -45,6 +46,7 @@ class ReaderController extends ChangeNotifier {
 
   bool _isAutoScrolling = false;
   double _autoScrollSpeed = 1.0;
+  bool _isPrefetchingNextChapter = false;
 
   bool _isWebtoonMode = true;
   bool _isRtlMode = false;
@@ -330,8 +332,27 @@ class ReaderController extends ChangeNotifier {
       _progressNotifier.value = progress;
       changed = true;
     }
+    if (changed) {
+      _maybePrefetchNextChapter();
+    }
     if (notifyController && changed) {
       _safeNotifyListeners();
+    }
+  }
+
+  void _maybePrefetchNextChapter() {
+    if (_isPrefetchingNextChapter || _pageUrls.isEmpty) return;
+    if (_currentPageNotifier.value >= _pageUrls.length - 2 && hasNextChapter) {
+      final nextChapter = _content.getNextChapter(_chapterId, _currentChapterNumber);
+      if (nextChapter != null && _apiService != null) {
+        if (_downloadService?.isChapterDownloaded(_content.mangaId, nextChapter.id) == true) {
+          return;
+        }
+        _isPrefetchingNextChapter = true;
+        _apiService.getChapterPages(_content.mangaId, nextChapter.id).catchError((_) => <ChapterPage>[]).whenComplete(() {
+          _isPrefetchingNextChapter = false;
+        });
+      }
     }
   }
 

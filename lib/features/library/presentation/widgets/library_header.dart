@@ -7,12 +7,14 @@ class LibraryHeader extends StatelessWidget {
   final bool isDark;
   final String selectedStatus;
   final bool showFavoritesOnly;
+  final bool showDownloadedOnly;
   final bool isGridView;
   final LibrarySortOption sortOption;
   final Map<String, int> statusCounts;
   final ValueChanged<String> onSearchChanged;
   final ValueChanged<String> onStatusChanged;
   final VoidCallback onToggleFavorites;
+  final VoidCallback onToggleDownloaded;
   final VoidCallback onToggleViewMode;
   final ValueChanged<LibrarySortOption> onSortChanged;
 
@@ -21,12 +23,14 @@ class LibraryHeader extends StatelessWidget {
     required this.isDark,
     required this.selectedStatus,
     required this.showFavoritesOnly,
+    this.showDownloadedOnly = false,
     required this.isGridView,
     required this.sortOption,
     required this.statusCounts,
     required this.onSearchChanged,
     required this.onStatusChanged,
     required this.onToggleFavorites,
+    required this.onToggleDownloaded,
     required this.onToggleViewMode,
     required this.onSortChanged,
   });
@@ -128,6 +132,7 @@ class LibraryHeader extends StatelessWidget {
             child: Row(
               children: [
                 _buildFavoriteChip(),
+                _buildDownloadedChip(),
                 _buildFilterChip('All'),
                 _buildFilterChip('Reading'),
                 _buildFilterChip('Completed'),
@@ -138,6 +143,47 @@ class LibraryHeader extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildDownloadedChip() {
+    return GestureDetector(
+      onTap: onToggleDownloaded,
+      child: Container(
+        margin: const EdgeInsets.only(right: 8),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        decoration: BoxDecoration(
+          color: showDownloadedOnly
+              ? AppColors.primary.withValues(alpha: 0.2)
+              : Colors.grey.withValues(alpha: 0.15),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: showDownloadedOnly ? AppColors.primary : Colors.transparent,
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              showDownloadedOnly
+                  ? Icons.download_done_rounded
+                  : Icons.download_rounded,
+              size: 14,
+              color: showDownloadedOnly ? AppColors.primary : Colors.grey,
+            ),
+            const SizedBox(width: 4),
+            Text(
+              'Downloaded',
+              style: TextStyle(
+                color: showDownloadedOnly ? AppColors.primary : Colors.grey,
+                fontWeight:
+                    showDownloadedOnly ? FontWeight.bold : FontWeight.normal,
+                fontSize: 12,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

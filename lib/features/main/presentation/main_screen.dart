@@ -107,13 +107,13 @@ class _MainScreenState extends State<MainScreen> {
     final isOffline = getIt.isRegistered<NetworkStatusService>() &&
         !getIt<NetworkStatusService>().isOnline;
 
-    if (isOffline && (index == 0 || index == 2)) {
+    if (isOffline && index == 2) {
       AlertBanner.show(
         context,
-        'This screen is unavailable in offline mode. Showing your Library.',
-        type: AlertBannerType.warning,
+        'Discover requires an active internet connection.',
+        type: AlertBannerType.info,
       );
-      index = 1;
+      return;
     }
 
     if (index != _currentIndex) {
