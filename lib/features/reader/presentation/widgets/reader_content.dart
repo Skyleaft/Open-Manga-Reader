@@ -83,8 +83,8 @@ class _ReaderContentWidgetState extends State<ReaderContentWidget> {
     final memCacheWidth =
         (contentWidth * devicePixelRatio).round().clamp(400, 1600);
 
-    // Precache next 2 pages and previous 1 page
-    for (int offset = -1; offset <= 2; offset++) {
+    // Precache next 4 pages and previous 1 page for resilient offline reading buffer
+    for (int offset = -1; offset <= 4; offset++) {
       final targetIndex = currentIndex + offset;
       if (targetIndex >= 0 && targetIndex < widget.pageUrls.length) {
         final rawUrl = widget.pageUrls[targetIndex];

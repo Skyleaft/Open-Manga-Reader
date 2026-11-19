@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import '../../../core/di/injection.dart';
+import '../../../core/storage/hive_storage.dart';
 import '../../manga_detail/models/manga_detail.dart';
 import '../../manga_detail/services/manga_detail_service.dart';
 import '../models/library_manga.dart';
@@ -25,6 +26,7 @@ class LibraryController extends ChangeNotifier {
   String _selectedStatus = 'All';
   String _searchQuery = '';
   bool _showFavoritesOnly = false;
+  bool _showDownloadedOnly = false;
   bool _isGridView = false;
   LibrarySortOption _sortOption = LibrarySortOption.lastUpdated;
 
@@ -34,6 +36,7 @@ class LibraryController extends ChangeNotifier {
   String get selectedStatus => _selectedStatus;
   String get searchQuery => _searchQuery;
   bool get showFavoritesOnly => _showFavoritesOnly;
+  bool get showDownloadedOnly => _showDownloadedOnly;
   bool get isGridView => _isGridView;
   LibrarySortOption get sortOption => _sortOption;
 
@@ -72,6 +75,15 @@ class LibraryController extends ChangeNotifier {
     return counts;
   }
 
+  bool _isMangaDownloaded(String mangaId) {
+    try {
+      final box = HiveStorage.downloadsBox;
+      return box.keys.any((k) => k.toString().startsWith('${mangaId}_'));
+    } catch (_) {
+      return false;
+    }
+  }
+
   List<LibraryManga> get filteredMangas {
     final list = _libraryMangas.where((m) {
       final matchesStatus = _selectedStatus == 'All' ||
@@ -80,8 +92,9 @@ class LibraryController extends ChangeNotifier {
           m.title.toLowerCase().contains(_searchQuery.toLowerCase()) ||
           m.author.toLowerCase().contains(_searchQuery.toLowerCase());
       final matchesFav = !_showFavoritesOnly || m.isFavorite;
+      final matchesDownloaded = !_showDownloadedOnly || _isMangaDownloaded(m.mangaId);
 
-      return matchesStatus && matchesSearch && matchesFav;
+      return matchesStatus && matchesSearch && matchesFav && matchesDownloaded;
     }).toList();
 
     // Apply Sorting
@@ -115,6 +128,11 @@ class LibraryController extends ChangeNotifier {
 
   void toggleFavoritesOnly() {
     _showFavoritesOnly = !_showFavoritesOnly;
+    notifyListeners();
+  }
+
+  void toggleDownloadedOnly() {
+    _showDownloadedOnly = !_showDownloadedOnly;
     notifyListeners();
   }
 

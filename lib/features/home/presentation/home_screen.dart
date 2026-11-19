@@ -4,6 +4,7 @@ import '../../../core/constants/app_colors.dart';
 import '../../../core/di/injection.dart';
 import '../../../core/models/manga_summary.dart';
 import '../../../core/network/manga_api_service.dart';
+import '../../../core/services/network_status_service.dart';
 import '../../../core/widgets/alert_banner.dart';
 import '../../../routes/app_pages.dart';
 import '../../discover/presentation/discover_screen.dart';
@@ -36,6 +37,10 @@ class _HomeScreenState extends State<HomeScreen>
   late final TabController _trendingTabController;
   final MangaApiService _apiService = getIt<MangaApiService>();
   bool _isRouteSubscribed = false;
+
+  bool get _isOffline =>
+      getIt.isRegistered<NetworkStatusService>() &&
+      !getIt<NetworkStatusService>().isOnline;
 
   @override
   bool get wantKeepAlive => true;
@@ -216,6 +221,32 @@ class _HomeScreenState extends State<HomeScreen>
               padding: const EdgeInsets.only(bottom: 120),
               sliver: SliverList.list(
                 children: [
+                  if (_isOffline)
+                    Container(
+                      margin: const EdgeInsets.fromLTRB(16, 8, 16, 4),
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                      decoration: BoxDecoration(
+                        color: Colors.amber.withValues(alpha: 0.12),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: Colors.amber.withValues(alpha: 0.3)),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(Icons.cloud_off_rounded, size: 16, color: Colors.amber[700]),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              'Offline Mode • Showing cached reading history',
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w500,
+                                color: Colors.amber[800],
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
                   const SizedBox(height: 12),
                   RepaintBoundary(
                     child: ListenableBuilder(

@@ -2,6 +2,8 @@ import 'dart:async';
 import 'dart:io';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/foundation.dart';
+import '../di/injection.dart';
+import '../network/sync_service.dart';
 
 class NetworkStatusService {
   final Connectivity _connectivity;
@@ -95,6 +97,15 @@ class NetworkStatusService {
       debugPrint(
         '🌐 [NetworkStatusService] Status changed: ${newStatus ? "ONLINE" : "OFFLINE"}',
       );
+
+      // Auto-trigger sync queue processing when connection is restored
+      if (newStatus) {
+        try {
+          if (getIt.isRegistered<SyncService>()) {
+            getIt<SyncService>().syncPendingActions();
+          }
+        } catch (_) {}
+      }
     }
   }
 

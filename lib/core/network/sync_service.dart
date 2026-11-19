@@ -85,8 +85,34 @@ class SyncService {
       final apiService = getIt<MangaApiService>();
       final entries = box.toMap().entries.toList();
 
+      // Coalesce progression_update entries: only keep the newest update per mangaId
+      final Map<String, dynamic> newestProgressionKey = {};
+      final List<dynamic> obsoleteKeys = [];
+
+      for (final entry in entries) {
+        try {
+          final action = SyncAction.fromMap(jsonDecode(entry.value as String));
+          if (action.type == 'progression_update') {
+            final mangaId = action.payload['mangaId']?.toString();
+            if (mangaId != null && mangaId.isNotEmpty) {
+              if (newestProgressionKey.containsKey(mangaId)) {
+                // An older entry exists, mark it for removal
+                obsoleteKeys.add(newestProgressionKey[mangaId]);
+              }
+              newestProgressionKey[mangaId] = entry.key;
+            }
+          }
+        } catch (_) {}
+      }
+
+      for (final oldKey in obsoleteKeys) {
+        await box.delete(oldKey);
+      }
+
       for (final entry in entries) {
         final key = entry.key;
+        if (obsoleteKeys.contains(key)) continue;
+
         final actionJson = entry.value as String;
         SyncAction action;
         try {

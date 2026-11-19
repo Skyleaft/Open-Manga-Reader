@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import '../../../core/di/injection.dart';
 import '../../../core/models/chapter_page.dart';
 import '../../../core/network/manga_api_service.dart';
+import '../../../core/services/network_status_service.dart';
 import '../../../core/storage/hive_storage.dart';
 import '../../../core/utils/url_utils.dart';
 import '../../manga_detail/models/manga_detail.dart';
@@ -43,6 +44,7 @@ class DownloadService {
   bool _isProcessingQueue = false;
   static const int _maxConcurrent = 2;
   int _activeCount = 0;
+  StreamSubscription<bool>? _networkSub;
 
   DownloadService({
     MangaApiService? apiService,
@@ -56,7 +58,59 @@ class DownloadService {
                 connectTimeout: const Duration(seconds: 30),
                 receiveTimeout: const Duration(seconds: 45),
               ),
-            );
+            ) {
+    _initNetworkListener();
+  }
+
+  void _initNetworkListener() {
+    if (getIt.isRegistered<NetworkStatusService>()) {
+      _networkSub = getIt<NetworkStatusService>().onStatusChange.listen((isOnline) {
+        if (!isOnline) {
+          _pauseAllForNetworkDrop();
+        } else {
+          _resumeAllAfterNetworkRestore();
+        }
+      });
+    }
+  }
+
+  void _pauseAllForNetworkDrop() {
+    final currentTasks = tasksNotifier.value;
+    for (final task in currentTasks.values) {
+      if (task.isDownloading || task.isQueued) {
+        _cancelTokens[task.chapter.id]?.cancel('Network lost');
+        _updateTaskStatus(
+          task.chapter.id,
+          status: DownloadStatus.paused,
+          errorMessage: 'Paused: waiting for network',
+        );
+      }
+    }
+  }
+
+  void _resumeAllAfterNetworkRestore() {
+    final currentTasks = tasksNotifier.value;
+    bool hasResumed = false;
+    for (final task in currentTasks.values) {
+      if (task.isPaused &&
+          task.errorMessage == 'Paused: waiting for network') {
+        _updateTaskStatus(
+          task.chapter.id,
+          status: DownloadStatus.queued,
+          errorMessage: null,
+        );
+        hasResumed = true;
+      }
+    }
+    if (hasResumed) {
+      _processQueue();
+    }
+  }
+
+  void dispose() {
+    _networkSub?.cancel();
+    tasksNotifier.dispose();
+  }
 
   // ---------------------------------------------------------------------------
   // Status Queries
@@ -374,11 +428,14 @@ class DownloadService {
       );
     } catch (e) {
       if (cancelToken.isCancelled) {
-        _updateTaskStatus(
-          chapterId,
-          status: DownloadStatus.canceled,
-          errorMessage: 'Download canceled',
-        );
+        final current = tasksNotifier.value[chapterId];
+        if (current?.status != DownloadStatus.paused) {
+          _updateTaskStatus(
+            chapterId,
+            status: DownloadStatus.canceled,
+            errorMessage: 'Download canceled',
+          );
+        }
       } else {
         _updateTaskStatus(
           chapterId,
