@@ -10,7 +10,8 @@ plugins {
 
 android {
     namespace = "com.example.my_manga_reader"
-    compileSdk = flutter.compileSdkVersion
+    compileSdk = 37
+    compileSdkMinor = 1
     ndkVersion = flutter.ndkVersion
 
     compileOptions {
@@ -31,6 +32,10 @@ android {
         release {
             signingConfig = signingConfigs.getByName("debug")
         }
+    }
+
+    androidResources {
+        ignoreAssetsPattern = "!.env:!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~"
     }
 }
 

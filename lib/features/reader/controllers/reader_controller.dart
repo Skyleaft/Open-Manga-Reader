@@ -1,13 +1,12 @@
 import 'dart:async';
-import 'dart:io' show Platform;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/painting.dart';
 import 'package:dio/dio.dart';
-import 'package:window_manager/legacy.dart';
 
 import '../../../core/di/injection.dart';
 import '../../../core/network/manga_api_service.dart';
+import '../../../core/services/window_service.dart';
 import '../../download/services/download_service.dart';
 import '../../history/models/progression.dart';
 import '../../history/services/progression_service.dart';
@@ -143,10 +142,9 @@ class ReaderController extends ChangeNotifier {
   }
 
   Future<void> checkInitialFullscreen() async {
-    if (!kIsWeb &&
-        (Platform.isWindows || Platform.isLinux || Platform.isMacOS)) {
+    if (WindowService.isDesktop) {
       try {
-        final isFull = await windowManager.isFullScreen();
+        final isFull = await getIt<WindowService>().isFullScreen();
         if (!_disposed) {
           _isFullscreen = isFull;
           _safeNotifyListeners();
@@ -158,10 +156,10 @@ class ReaderController extends ChangeNotifier {
   }
 
   Future<void> toggleFullscreen() async {
-    if (!kIsWeb &&
-        (Platform.isWindows || Platform.isLinux || Platform.isMacOS)) {
-      final isFull = await windowManager.isFullScreen();
-      await windowManager.setFullScreen(!isFull);
+    if (WindowService.isDesktop) {
+      final windowService = getIt<WindowService>();
+      final isFull = await windowService.isFullScreen();
+      await windowService.setFullScreen(!isFull);
       if (!_disposed) {
         _isFullscreen = !isFull;
         _safeNotifyListeners();

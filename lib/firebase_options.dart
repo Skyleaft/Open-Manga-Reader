@@ -3,16 +3,19 @@ import 'package:flutter/foundation.dart'
     show defaultTargetPlatform, kIsWeb, TargetPlatform;
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 
+String _safeGet(String key, String fallback) {
+  try {
+    if (dotenv.isInitialized) {
+      final val = dotenv.maybeGet(key);
+      if (val != null && val.trim().isNotEmpty) {
+        return val.trim();
+      }
+    }
+  } catch (_) {}
+  return fallback;
+}
+
 /// Default [FirebaseOptions] for use with your Firebase apps.
-///
-/// Example:
-/// ```dart
-/// import 'firebase_options.dart';
-/// // ...
-/// await Firebase.initializeApp(
-///   options: DefaultFirebaseOptions.currentPlatform,
-/// );
-/// ```
 class DefaultFirebaseOptions {
   static FirebaseOptions get currentPlatform {
     if (kIsWeb) {
@@ -40,52 +43,52 @@ class DefaultFirebaseOptions {
   }
 
   static FirebaseOptions get web => FirebaseOptions(
-    apiKey: dotenv.get('FIREBASE_WEB_API_KEY'),
-    appId: dotenv.get('FIREBASE_WEB_APP_ID'),
-    messagingSenderId: dotenv.get('FIREBASE_SENDER_ID'),
-    projectId: dotenv.get('FIREBASE_PROJECT_ID'),
-    authDomain: dotenv.get('FIREBASE_WEB_AUTH_DOMAIN'),
-    storageBucket: dotenv.get('FIREBASE_STORAGE_BUCKET'),
-    measurementId: dotenv.get('FIREBASE_WEB_MEASUREMENT_ID'),
+    apiKey: _safeGet('FIREBASE_WEB_API_KEY', 'AIzaSyDgR_mJy_csEL8xuF1R2sbW9KYfXOP7dP4'),
+    appId: _safeGet('FIREBASE_WEB_APP_ID', '1:933021714823:web:dad6f9ef3e4ef64e6beb22'),
+    messagingSenderId: _safeGet('FIREBASE_SENDER_ID', '933021714823'),
+    projectId: _safeGet('FIREBASE_PROJECT_ID', 'mykomikid'),
+    authDomain: _safeGet('FIREBASE_WEB_AUTH_DOMAIN', 'mykomikid.firebaseapp.com'),
+    storageBucket: _safeGet('FIREBASE_STORAGE_BUCKET', 'mykomikid.firebasestorage.app'),
+    measurementId: _safeGet('FIREBASE_WEB_MEASUREMENT_ID', 'G-CYZTXLGZ9V'),
   );
 
   static FirebaseOptions get android => FirebaseOptions(
-    apiKey: dotenv.get('FIREBASE_ANDROID_API_KEY'),
-    appId: dotenv.get('FIREBASE_ANDROID_APP_ID'),
-    messagingSenderId: dotenv.get('FIREBASE_SENDER_ID'),
-    projectId: dotenv.get('FIREBASE_PROJECT_ID'),
-    storageBucket: dotenv.get('FIREBASE_STORAGE_BUCKET'),
+    apiKey: _safeGet('FIREBASE_ANDROID_API_KEY', 'AIzaSyAmWuF42h4xPQyzK0PyAPyD4OkZtG6kLvk'),
+    appId: _safeGet('FIREBASE_ANDROID_APP_ID', '1:933021714823:android:12c52e3c41c917ea6beb22'),
+    messagingSenderId: _safeGet('FIREBASE_SENDER_ID', '933021714823'),
+    projectId: _safeGet('FIREBASE_PROJECT_ID', 'mykomikid'),
+    storageBucket: _safeGet('FIREBASE_STORAGE_BUCKET', 'mykomikid.firebasestorage.app'),
   );
 
   static FirebaseOptions get ios => FirebaseOptions(
-    apiKey: dotenv.get('FIREBASE_IOS_API_KEY'),
-    appId: dotenv.get('FIREBASE_IOS_APP_ID'),
-    messagingSenderId: dotenv.get('FIREBASE_SENDER_ID'),
-    projectId: dotenv.get('FIREBASE_PROJECT_ID'),
-    storageBucket: dotenv.get('FIREBASE_STORAGE_BUCKET'),
-    androidClientId: dotenv.get('FIREBASE_ANDROID_CLIENT_ID'),
-    iosClientId: dotenv.get('FIREBASE_IOS_CLIENT_ID'),
-    iosBundleId: dotenv.get('FIREBASE_IOS_BUNDLE_ID'),
+    apiKey: _safeGet('FIREBASE_IOS_API_KEY', 'AIzaSyCb2JLeTrvuxG53vhnlfPjYR5W_mJTMSuw'),
+    appId: _safeGet('FIREBASE_IOS_APP_ID', '1:933021714823:ios:a4b33d526b8ef3cb6beb22'),
+    messagingSenderId: _safeGet('FIREBASE_SENDER_ID', '933021714823'),
+    projectId: _safeGet('FIREBASE_PROJECT_ID', 'mykomikid'),
+    storageBucket: _safeGet('FIREBASE_STORAGE_BUCKET', 'mykomikid.firebasestorage.app'),
+    androidClientId: _safeGet('FIREBASE_ANDROID_CLIENT_ID', '933021714823-5msjvbhrpm6c4745bis90hqg40le5gcj.apps.googleusercontent.com'),
+    iosClientId: _safeGet('FIREBASE_IOS_CLIENT_ID', '933021714823-k8q9t0kud5ks7k30qc6qm2e170f7j5m5.apps.googleusercontent.com'),
+    iosBundleId: _safeGet('FIREBASE_IOS_BUNDLE_ID', 'com.example.myMangaReader'),
   );
 
   static FirebaseOptions get macos => FirebaseOptions(
-    apiKey: dotenv.get('FIREBASE_IOS_API_KEY'),
-    appId: dotenv.get('FIREBASE_IOS_APP_ID'),
-    messagingSenderId: dotenv.get('FIREBASE_SENDER_ID'),
-    projectId: dotenv.get('FIREBASE_PROJECT_ID'),
-    storageBucket: dotenv.get('FIREBASE_STORAGE_BUCKET'),
-    androidClientId: dotenv.get('FIREBASE_ANDROID_CLIENT_ID'),
-    iosClientId: dotenv.get('FIREBASE_IOS_CLIENT_ID'),
-    iosBundleId: dotenv.get('FIREBASE_IOS_BUNDLE_ID'),
+    apiKey: _safeGet('FIREBASE_IOS_API_KEY', 'AIzaSyCb2JLeTrvuxG53vhnlfPjYR5W_mJTMSuw'),
+    appId: _safeGet('FIREBASE_IOS_APP_ID', '1:933021714823:ios:a4b33d526b8ef3cb6beb22'),
+    messagingSenderId: _safeGet('FIREBASE_SENDER_ID', '933021714823'),
+    projectId: _safeGet('FIREBASE_PROJECT_ID', 'mykomikid'),
+    storageBucket: _safeGet('FIREBASE_STORAGE_BUCKET', 'mykomikid.firebasestorage.app'),
+    androidClientId: _safeGet('FIREBASE_ANDROID_CLIENT_ID', '933021714823-5msjvbhrpm6c4745bis90hqg40le5gcj.apps.googleusercontent.com'),
+    iosClientId: _safeGet('FIREBASE_IOS_CLIENT_ID', '933021714823-k8q9t0kud5ks7k30qc6qm2e170f7j5m5.apps.googleusercontent.com'),
+    iosBundleId: _safeGet('FIREBASE_IOS_BUNDLE_ID', 'com.example.myMangaReader'),
   );
 
   static FirebaseOptions get windows => FirebaseOptions(
-    apiKey: dotenv.get('FIREBASE_WEB_API_KEY'),
-    appId: dotenv.get('FIREBASE_WINDOWS_APP_ID'),
-    messagingSenderId: dotenv.get('FIREBASE_SENDER_ID'),
-    projectId: dotenv.get('FIREBASE_PROJECT_ID'),
-    authDomain: dotenv.get('FIREBASE_WEB_AUTH_DOMAIN'),
-    storageBucket: dotenv.get('FIREBASE_STORAGE_BUCKET'),
-    measurementId: dotenv.get('FIREBASE_WINDOWS_MEASUREMENT_ID'),
+    apiKey: _safeGet('FIREBASE_WEB_API_KEY', 'AIzaSyDgR_mJy_csEL8xuF1R2sbW9KYfXOP7dP4'),
+    appId: _safeGet('FIREBASE_WINDOWS_APP_ID', '1:933021714823:web:a200daf885f9f49a6beb22'),
+    messagingSenderId: _safeGet('FIREBASE_SENDER_ID', '933021714823'),
+    projectId: _safeGet('FIREBASE_PROJECT_ID', 'mykomikid'),
+    authDomain: _safeGet('FIREBASE_WEB_AUTH_DOMAIN', 'mykomikid.firebaseapp.com'),
+    storageBucket: _safeGet('FIREBASE_STORAGE_BUCKET', 'mykomikid.firebasestorage.app'),
+    measurementId: _safeGet('FIREBASE_WINDOWS_MEASUREMENT_ID', 'G-93PM1WCF5P'),
   );
 }

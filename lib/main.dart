@@ -17,40 +17,8 @@ import 'core/services/notification_service.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Initialize Hive storage and migrate data from SharedPreferences if needed
-  await HiveStorage.init();
-  await HiveStorage.migrateFromSharedPreferences();
-
-  // Configure Flutter ImageCache limits to prevent memory bloat
-  PaintingBinding.instance.imageCache.maximumSize = 100; // max 100 cached images
-  PaintingBinding.instance.imageCache.maximumSizeBytes = 100 * 1024 * 1024; // max 100MB RAM cache
-
-  // Desktop protocol setup
-  if (!kIsWeb && (Platform.isWindows || Platform.isLinux || Platform.isMacOS)) {
-    await protocolHandler.register('open-manga-reader');
-  }
-
-  // Load .env file
-  await dotenv.load(fileName: '.env');
-
-  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
-
-  // Preload Google Fonts
-  GoogleFonts.pendingFonts;
-
-  // Initialize app configuration
-  await AppConfig.init();
-
-  // Setup Dependency Injection
-  await setupInjection();
-
-  // Initialize FCM Notification Service
-  if (NotificationService.isSupported) {
-    FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
-    await getIt<NotificationService>().init();
-  }
-
-  // Global Flutter and Platform Error Boundaries
+  // 1. Global Flutter and Platform Error Boundaries FIRST
+  // Captures any error occurring during startup or later execution
   FlutterError.onError = (details) {
     FlutterError.presentError(details);
     debugPrint('Flutter Error: ${details.exceptionAsString()}');
@@ -61,13 +29,79 @@ void main() async {
     return true;
   };
 
-  // Set default transparent system overlay on mobile
+  // 2. Set default transparent system overlay on mobile
   SystemChrome.setSystemUIOverlayStyle(
     const SystemUiOverlayStyle(
       statusBarColor: Colors.transparent,
       systemNavigationBarColor: Colors.transparent,
     ),
   );
+
+  // Configure Flutter ImageCache limits to prevent memory bloat
+  PaintingBinding.instance.imageCache.maximumSize = 100; // max 100 cached images
+  PaintingBinding.instance.imageCache.maximumSizeBytes = 100 * 1024 * 1024; // max 100MB RAM cache
+
+  // Desktop protocol setup
+  if (!kIsWeb && (Platform.isWindows || Platform.isLinux || Platform.isMacOS)) {
+    try {
+      await protocolHandler.register('open-manga-reader');
+    } catch (e) {
+      debugPrint('ProtocolHandler registration error: $e');
+    }
+  }
+
+  // Initialize Hive storage and migrate data safely
+  try {
+    await HiveStorage.init();
+    await HiveStorage.migrateFromSharedPreferences();
+  } catch (e, stack) {
+    debugPrint('HiveStorage initialization error: $e\n$stack');
+  }
+
+  // Load .env file
+  try {
+    await dotenv.load(fileName: '.env');
+  } catch (e) {
+    debugPrint('dotenv load warning/error: $e');
+  }
+
+  // Initialize Firebase
+  try {
+    await Firebase.initializeApp(
+      options: DefaultFirebaseOptions.currentPlatform,
+    );
+  } catch (e, stack) {
+    debugPrint('Firebase initialization error: $e\n$stack');
+  }
+
+  // Preload Google Fonts
+  GoogleFonts.pendingFonts;
+
+  // Setup Dependency Injection (initializes AppConfig, ThemeProvider, etc.)
+  try {
+    await setupInjection();
+  } catch (e, stack) {
+    debugPrint('Dependency injection error: $e\n$stack');
+  }
+
+  // Initialize FCM Notification Service in the background (NON-BLOCKING)
+  // Requesting permissions or fetching FCM tokens before the first frame is rendered
+  // causes Android splash screen deadlocks (OnPreDrawListener cancels draw indefinitely).
+  if (NotificationService.isSupported) {
+    try {
+      FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
+      getIt<NotificationService>().init().then((_) {
+        // Request notification permission safely AFTER UI has drawn its first frame
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          getIt<NotificationService>().requestPermissions();
+        });
+      }).catchError((e) {
+        debugPrint('NotificationService init error: $e');
+      });
+    } catch (e) {
+      debugPrint('Error registering notification handler: $e');
+    }
+  }
 
   runApp(const MyApp());
 }

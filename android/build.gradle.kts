@@ -21,19 +21,16 @@ subprojects {
 }
 
 subprojects {
-    val configureProject: Project.() -> Unit = {
-        if (project.name.contains("flutter_avif")) {
-            extensions.findByType(com.android.build.gradle.BaseExtension::class.java)
-                ?.sourceSets?.findByName("main")?.java?.setSrcDirs(emptyList<File>())
+    if (project.name != "app") {
+        afterEvaluate {
+            if (project.name.contains("flutter_avif")) {
+                extensions.findByType(com.android.build.gradle.BaseExtension::class.java)
+                    ?.sourceSets?.findByName("main")?.java?.setSrcDirs(emptyList<File>())
+            }
+            extensions.findByType(com.android.build.gradle.BaseExtension::class.java)?.apply {
+                compileSdkVersion("android-37.1")
+            }
         }
-        extensions.findByType(com.android.build.gradle.BaseExtension::class.java)?.apply {
-            compileSdkVersion(36)
-        }
-    }
-    if (state.executed) {
-        configureProject()
-    } else {
-        afterEvaluate { configureProject() }
     }
 
     tasks.withType(org.jetbrains.kotlin.gradle.tasks.KotlinCompile::class.java).configureEach {

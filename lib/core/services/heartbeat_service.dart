@@ -15,17 +15,21 @@ class HeartbeatService with WidgetsBindingObserver {
       _isObserverAdded = true;
     }
 
-    _authSubscription?.cancel();
-    _authSubscription = FirebaseAuth.instance.authStateChanges().listen((User? user) {
-      if (user != null) {
-        start();
-      } else {
-        stop();
-      }
-    });
+    try {
+      _authSubscription?.cancel();
+      _authSubscription = FirebaseAuth.instance.authStateChanges().listen((User? user) {
+        if (user != null) {
+          start();
+        } else {
+          stop();
+        }
+      });
 
-    if (FirebaseAuth.instance.currentUser != null) {
-      start();
+      if (FirebaseAuth.instance.currentUser != null) {
+        start();
+      }
+    } catch (e) {
+      debugPrint('HeartbeatService auth listener warning/error: $e');
     }
   }
 

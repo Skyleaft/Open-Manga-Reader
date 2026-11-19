@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:flutter/material.dart' as flutter_material;
 import 'package:material_ui/material_ui.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:provider/provider.dart';
@@ -52,6 +53,10 @@ class MyApp extends StatelessWidget {
             theme: themeProvider.lightThemeData,
             darkTheme: themeProvider.darkThemeData,
             themeMode: themeProvider.themeMode,
+            builder: (context, child) => flutter_material.Material(
+              type: flutter_material.MaterialType.transparency,
+              child: child ?? const SizedBox.shrink(),
+            ),
             home: const AuthWrapper(),
             onGenerateRoute: AppRoutes.onGenerateRoute,
           );

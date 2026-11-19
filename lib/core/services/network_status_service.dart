@@ -19,9 +19,6 @@ class NetworkStatusService {
       : _connectivity = connectivity ?? Connectivity();
 
   Future<void> init() async {
-    // Initial check
-    await checkConnectivity();
-
     // Listen for hardware connectivity changes
     _subscription = _connectivity.onConnectivityChanged.listen((results) async {
       await _handleConnectivityResults(results);
@@ -31,6 +28,10 @@ class NetworkStatusService {
     _periodicCheckTimer = Timer.periodic(const Duration(seconds: 30), (_) async {
       await checkConnectivity();
     });
+
+    // Perform initial reachability check asynchronously in the background
+    // to avoid stalling app cold start during DNS resolution
+    unawaited(checkConnectivity());
   }
 
   Future<bool> checkConnectivity() async {
