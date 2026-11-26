@@ -37,7 +37,7 @@ dependencies:
   share_plus: ^13.3.1
   app_links: ^7.2.2
   protocol_handler: ^0.3.0
-  window_manager: ^0.7.0
+  window_manager: ^0.7.1
   battery_plus: ^7.1.1
   firebase_messaging: ^17.1.0
   flutter_local_notifications: ^23.0.2
