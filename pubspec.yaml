@@ -25,7 +25,7 @@ dependencies:
   jikan_api: ^3.0.1
   shared_preferences: ^2.5.6
   hive_ce: ^2.20.0
-  hive_ce_flutter: ^2.5.0
+  hive_ce_flutter: ^2.6.0
   path_provider: ^2.1.5
   url_launcher: ^6.3.3
   uuid: ^4.6.0
